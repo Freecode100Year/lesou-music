@@ -1,0 +1,15 @@
+{
+  "name": "XQL MUSIC - 全网音乐聚合",
+  "short_name": "XQL Music",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1a1a2e",
+  "background_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
