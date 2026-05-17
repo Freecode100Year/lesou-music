@@ -117,6 +117,8 @@ export default function App() {
         currentPage={currentPage}
         setPage={setCurrentPage}
         onSearchFocus={handleSearchFocus}
+        gainMultiplier={player.gainMultiplier}
+        onSetGainMultiplier={player.setGainMultiplier}
       >
         {currentPage === 'home' && (
           <HomePage
@@ -170,11 +172,13 @@ export default function App() {
         duration={player.duration}
         volume={player.volume}
         playMode={player.playMode}
+        spatialAudio={player.spatialAudio}
         loading={player.loading}
         onTogglePlay={player.togglePlay}
         onSeek={player.seek}
         onSetVolume={player.setVolume}
         onSetPlayMode={player.setPlayMode}
+        onToggleSpatial={player.toggleSpatialAudio}
         onNext={player.playNext}
         onPrev={player.playPrev}
         onShowLyrics={() => setShowLyrics(true)}

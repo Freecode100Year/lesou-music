@@ -7,6 +7,8 @@ const KEYS = {
   SEARCH_HISTORY: 'xql_search_history',
   VOLUME: 'xql_volume',
   PLAY_MODE: 'xql_play_mode',
+  SPATIAL_AUDIO: 'xql_spatial_audio',
+  GAIN_MULTIPLIER: 'xql_gain_multiplier',
 } as const;
 
 export function getUser(): UserInfo | null {
@@ -77,4 +79,22 @@ export function getPlayMode(): string {
 
 export function setPlayMode(mode: string): void {
   localStorage.setItem(KEYS.PLAY_MODE, mode);
+}
+
+export function getSpatialAudio(): boolean {
+  const raw = localStorage.getItem(KEYS.SPATIAL_AUDIO);
+  return raw === null ? true : raw === 'true';
+}
+
+export function setSpatialAudio(enabled: boolean): void {
+  localStorage.setItem(KEYS.SPATIAL_AUDIO, String(enabled));
+}
+
+export function getGainMultiplier(): number {
+  const raw = localStorage.getItem(KEYS.GAIN_MULTIPLIER);
+  return raw ? parseFloat(raw) : 1.0;
+}
+
+export function setGainMultiplier(gain: number): void {
+  localStorage.setItem(KEYS.GAIN_MULTIPLIER, String(gain));
 }

@@ -11,11 +11,13 @@ interface PlayerProps {
   duration: number;
   volume: number;
   playMode: PlayMode;
+  spatialAudio: boolean;
   loading: boolean;
   onTogglePlay: () => void;
   onSeek: (time: number) => void;
   onSetVolume: (vol: number) => void;
   onSetPlayMode: (mode: PlayMode) => void;
+  onToggleSpatial: () => void;
   onNext: () => void;
   onPrev: () => void;
   onShowLyrics: () => void;
@@ -29,11 +31,13 @@ export function Player({
   duration,
   volume,
   playMode,
+  spatialAudio,
   loading,
   onTogglePlay,
   onSeek,
   onSetVolume,
   onSetPlayMode,
+  onToggleSpatial,
   onNext,
   onPrev,
   onShowLyrics,
@@ -189,6 +193,17 @@ export function Player({
           <button className="player-btn" onClick={onShowQueue}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
               <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
+            </svg>
+          </button>
+          <button
+            className={`player-btn spatial-btn ${spatialAudio ? 'active' : ''}`}
+            onClick={onToggleSpatial}
+            title={spatialAudio ? '杜比全景声: 开' : '杜比全景声: 关'}
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M12 3v18c-5-2-8-6-8-9s3-7 8-9z" opacity={spatialAudio ? 1 : 0.4} />
+              <path d="M14 5.5c3 1.5 5 4.5 5 6.5s-2 5-5 6.5" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={spatialAudio ? 1 : 0.3} />
+              <path d="M16 3.5c4 2 6.5 5.5 6.5 8.5s-2.5 6.5-6.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={spatialAudio ? 1 : 0.3} />
             </svg>
           </button>
         </div>
