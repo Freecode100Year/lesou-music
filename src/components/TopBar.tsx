@@ -12,7 +12,6 @@ export function TopBar({ currentPage, onMenuClick, onSearchFocus }: TopBarProps)
     home: '发现音乐',
     search: '搜索',
     starred: '我的收藏',
-    login: '账户',
   };
 
   return (

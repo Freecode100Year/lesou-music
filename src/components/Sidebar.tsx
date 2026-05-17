@@ -1,15 +1,14 @@
 import React from 'react';
-import { Page, UserInfo } from '../types';
+import { Page } from '../types';
 
 interface SidebarProps {
   currentPage: Page;
   setPage: (page: Page) => void;
-  user: UserInfo | null;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
 }
 
-export function Sidebar({ currentPage, setPage, user, mobileOpen, setMobileOpen }: SidebarProps) {
+export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen }: SidebarProps) {
   const navigate = (page: Page) => {
     setPage(page);
     setMobileOpen(false);
@@ -63,17 +62,6 @@ export function Sidebar({ currentPage, setPage, user, mobileOpen, setMobileOpen 
           </button>
         </nav>
 
-        <div className="sidebar-footer">
-          <button
-            className={`sidebar-item ${currentPage === 'login' ? 'active' : ''}`}
-            onClick={() => navigate('login')}
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-            </svg>
-            <span>{user ? user.username : '登录'}</span>
-          </button>
-        </div>
       </aside>
     </>
   );

@@ -1,17 +1,16 @@
-import React, { useState, useCallback } from 'react';
-import { Page, UserInfo, Song } from '../types';
+import React, { useState } from 'react';
+import { Page } from '../types';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
 interface LayoutProps {
   currentPage: Page;
   setPage: (page: Page) => void;
-  user: UserInfo | null;
   children: React.ReactNode;
   onSearchFocus: () => void;
 }
 
-export function Layout({ currentPage, setPage, user, children, onSearchFocus }: LayoutProps) {
+export function Layout({ currentPage, setPage, children, onSearchFocus }: LayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -19,7 +18,6 @@ export function Layout({ currentPage, setPage, user, children, onSearchFocus }: 
       <Sidebar
         currentPage={currentPage}
         setPage={setPage}
-        user={user}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />

@@ -39,7 +39,7 @@ export interface UserInfo {
 
 export type PlayMode = 'sequential' | 'repeat-one' | 'shuffle';
 
-export type Page = 'home' | 'search' | 'starred' | 'login';
+export type Page = 'home' | 'search' | 'starred';
 
 export interface ToastMessage {
   id: string;

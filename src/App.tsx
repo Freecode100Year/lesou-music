@@ -10,7 +10,6 @@ import { Layout } from './components/Layout';
 import { HomePage } from './components/HomePage';
 import { SearchPage } from './components/SearchPage';
 import { StarredPage } from './components/StarredPage';
-import { LoginPage } from './components/LoginPage';
 import { Player } from './components/Player';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { QueuePanel } from './components/QueuePanel';
@@ -117,7 +116,6 @@ export default function App() {
       <Layout
         currentPage={currentPage}
         setPage={setCurrentPage}
-        user={userHook.user}
         onSearchFocus={handleSearchFocus}
       >
         {currentPage === 'home' && (
@@ -161,13 +159,6 @@ export default function App() {
             onStar={userHook.toggleStar}
             onAddToQueue={(song) => player.addToQueue([song])}
             onDownload={handleDownload}
-          />
-        )}
-        {currentPage === 'login' && (
-          <LoginPage
-            user={userHook.user}
-            login={userHook.login}
-            logout={userHook.logout}
           />
         )}
       </Layout>
