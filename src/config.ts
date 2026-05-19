@@ -4,6 +4,7 @@ export const API = {
   GD: '/api/gd',
   PJMP3: '/api/pjmp3',
   QQ_SEARCH: '/qqapi/soso/fcgi-bin/client_search_cp',
+  YOUTUBE_SEARCH: '/api/youtube-search',
 } as const;
 
 export const PLATFORMS = [
@@ -11,6 +12,7 @@ export const PLATFORMS = [
   { key: 'wy', label: '网易云', type: 'standard' as const },
   { key: 'kw', label: '酷我', type: 'standard' as const },
   { key: 'qq', label: 'QQ音乐', type: 'qq' as const },
+  { key: 'ytmusic', label: 'YouTube音乐', type: 'youtube' as const },
 ] as const;
 
 export const CACHE_TTL = {

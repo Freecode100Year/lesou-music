@@ -8,14 +8,16 @@ export interface Song {
   duration?: number;
   source: SongSource;
   sourceType: SourceType;
+  externalUrl?: string;
 }
 
-export type SourceType = 'standard' | 'gd' | 'pjmp3' | 'qq';
+export type SourceType = 'standard' | 'gd' | 'pjmp3' | 'qq' | 'youtube';
 export type StandardPlatform = 'wy' | 'kw';
 export type GDSource = 'netease' | 'kuwo';
 export type PjmpSource = 'all';
 export type QQSource = 'qq';
-export type SongSource = StandardPlatform | GDSource | PjmpSource | QQSource;
+export type YouTubeSource = 'ytmusic';
+export type SongSource = StandardPlatform | GDSource | PjmpSource | QQSource | YouTubeSource;
 
 export interface SongDetail {
   url: string;

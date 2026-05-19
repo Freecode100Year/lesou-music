@@ -284,6 +284,8 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
   }, []);
 
   const fetchSongUrl = useCallback(async (song: Song): Promise<string | null> => {
+    if (song.sourceType === 'youtube') return null;
+
     const cacheKey = `song_url_${song.sourceType}_${song.source}_${song.id}`;
     const cached = requestCache.get<string>(cacheKey);
     if (cached) return cached;

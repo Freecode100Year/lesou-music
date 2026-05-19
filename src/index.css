@@ -561,6 +561,11 @@ a {
   text-transform: uppercase;
 }
 
+.source-badge-youtube {
+  background: rgba(255, 0, 0, 0.12);
+  color: #ff4444;
+}
+
 .loading-more {
   display: flex;
   justify-content: center;

@@ -48,10 +48,20 @@ export default function App() {
   });
 
   const playSongInList = useCallback((song: Song, list: Song[], index: number) => {
+    if (song.sourceType === 'youtube' && song.externalUrl) {
+      window.open(song.externalUrl, '_blank');
+      addToast('已在新标签页打开 YouTube Music', 'info');
+      return;
+    }
     player.playSong(song, list, index);
-  }, [player.playSong]);
+  }, [player.playSong, addToast]);
 
   const handleDownload = useCallback(async (song: Song) => {
+    if (song.sourceType === 'youtube' && song.externalUrl) {
+      window.open(song.externalUrl, '_blank');
+      addToast('已在新标签页打开 YouTube Music', 'info');
+      return;
+    }
     let url = '';
     const cacheKey = `song_url_${song.sourceType}_${song.source}_${song.id}`;
     const cached = requestCache.get<string>(cacheKey);
@@ -115,6 +125,11 @@ export default function App() {
   const handleQueuePlay = useCallback((index: number) => {
     const song = player.queue[index];
     if (song) {
+      if (song.sourceType === 'youtube' && song.externalUrl) {
+        window.open(song.externalUrl, '_blank');
+        addToast('已在新标签页打开 YouTube Music', 'info');
+        return;
+      }
       player.playSong(song, player.queue, index);
     }
   }, [player]);
