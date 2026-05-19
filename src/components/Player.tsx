@@ -55,16 +55,36 @@ export function Player({
     }
     setCoverUrl('');
     const loadCover = async () => {
-      if (currentSong.pic) {
-        setCoverUrl(currentSong.pic);
-        return;
-      }
       const cacheKey = `pic_${currentSong.sourceType}_${currentSong.source}_${currentSong.id}`;
       const cached = requestCache.get<string>(cacheKey);
       if (cached) {
         setCoverUrl(cached);
         return;
       }
+
+      if (currentSong.pic && currentSong.pic.startsWith('http')) {
+        setCoverUrl(currentSong.pic);
+        return;
+      }
+
+      if (currentSong.pic && (currentSong.source === 'kw' || currentSong.source === 'kuwo')) {
+        const url = `https://img2.kuwo.cn/star/albumcover/${currentSong.pic}`;
+        setCoverUrl(url);
+        return;
+      }
+
+      if (currentSong.pic && (currentSong.source === 'wy' || currentSong.source === 'netease')) {
+        try {
+          const res = await fetch(`${API.GD}?types=pic&source=netease&id=${currentSong.pic}&size=300`);
+          const data = await res.json();
+          if (data.url) {
+            requestCache.set(cacheKey, data.url, CACHE_TTL.PIC);
+            setCoverUrl(data.url);
+          }
+        } catch {}
+        return;
+      }
+
       if (currentSong.sourceType === 'gd') {
         try {
           const res = await fetch(`${API.GD}?types=pic&source=${currentSong.source}&id=${currentSong.pic_id || currentSong.id}&size=300`);
@@ -73,9 +93,7 @@ export function Player({
             requestCache.set(cacheKey, data.url, CACHE_TTL.PIC);
             setCoverUrl(data.url);
           }
-        } catch {
-          setCoverUrl('');
-        }
+        } catch {}
       }
     };
     loadCover();

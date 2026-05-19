@@ -34,10 +34,36 @@ export function SongRow({ song, index, isPlaying, isStarred, onPlay, onStar, onA
     setImgLoaded(false);
 
     const loadPic = async () => {
-      if (song.pic) {
+      if (!song.pic) return;
+
+      if (song.pic.startsWith('http')) {
         setImgSrc(song.pic);
         return;
       }
+
+      if (song.source === 'kw' || song.source === 'kuwo') {
+        setImgSrc(`https://img2.kuwo.cn/star/albumcover/${song.pic}`);
+        return;
+      }
+
+      if (song.source === 'wy' || song.source === 'netease') {
+        const cacheKey = `pic_netease_${song.pic}`;
+        const cached = requestCache.get<string>(cacheKey);
+        if (cached) {
+          setImgSrc(cached);
+          return;
+        }
+        try {
+          const res = await fetch(`${API.GD}?types=pic&source=netease&id=${song.pic}&size=300`);
+          const data = await res.json();
+          if (data.url) {
+            requestCache.set(cacheKey, data.url, CACHE_TTL.PIC);
+            setImgSrc(data.url);
+          }
+        } catch {}
+        return;
+      }
+
       if (song.sourceType === 'gd' && song.pic_id) {
         const cacheKey = `pic_${song.sourceType}_${song.source}_${song.id}`;
         const cached = requestCache.get<string>(cacheKey);
@@ -52,9 +78,7 @@ export function SongRow({ song, index, isPlaying, isStarred, onPlay, onStar, onA
             requestCache.set(cacheKey, data.url, CACHE_TTL.PIC);
             setImgSrc(data.url);
           }
-        } catch {
-          // leave blank
-        }
+        } catch {}
       }
     };
 

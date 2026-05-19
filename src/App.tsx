@@ -121,9 +121,15 @@ export default function App() {
 
   const getCoverUrl = (): string => {
     if (!player.currentSong) return '';
-    if (player.currentSong.pic) return player.currentSong.pic;
-    const cacheKey = `pic_${player.currentSong.sourceType}_${player.currentSong.source}_${player.currentSong.id}`;
-    return requestCache.get<string>(cacheKey) || '';
+    const song = player.currentSong;
+    const cacheKey = `pic_${song.sourceType}_${song.source}_${song.id}`;
+    const cached = requestCache.get<string>(cacheKey);
+    if (cached) return cached;
+    if (song.pic && song.pic.startsWith('http')) return song.pic;
+    if (song.pic && (song.source === 'kw' || song.source === 'kuwo')) {
+      return `https://img2.kuwo.cn/star/albumcover/${song.pic}`;
+    }
+    return '';
   };
 
   return (

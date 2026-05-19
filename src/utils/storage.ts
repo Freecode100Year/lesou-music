@@ -83,7 +83,7 @@ export function setPlayMode(mode: string): void {
 
 export function getSpatialAudio(): boolean {
   const raw = localStorage.getItem(KEYS.SPATIAL_AUDIO);
-  return raw === null ? true : raw === 'true';
+  return raw === null ? false : raw === 'true';
 }
 
 export function setSpatialAudio(enabled: boolean): void {
