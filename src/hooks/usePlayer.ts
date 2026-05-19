@@ -118,23 +118,8 @@ export function usePlayer(
     return nodes;
   }, []);
 
-  const ensureCrossOrigin = useCallback(() => {
-    if (!audioRef.current || audioRef.current.crossOrigin) return;
-    audioRef.current.crossOrigin = 'anonymous';
-    const src = audioRef.current.src;
-    const time = audioRef.current.currentTime;
-    const wasPlaying = !audioRef.current.paused;
-    if (src) {
-      audioRef.current.src = src;
-      audioRef.current.currentTime = time;
-      if (wasPlaying) audioRef.current.play().catch(() => {});
-    }
-  }, []);
-
   const activateWebAudio = useCallback((useSpatial: boolean) => {
     if (!audioRef.current) return;
-
-    ensureCrossOrigin();
 
     let ctx = audioCtxRef.current;
     if (!ctx) {
@@ -190,11 +175,17 @@ export function usePlayer(
     gainNode.connect(ctx.destination);
     webAudioActiveRef.current = true;
     ctx.resume().catch(() => {});
-  }, [disconnectSafe, ensureCrossOrigin, ensureGainNode, ensureSpatialNodes, equalizer]);
+  }, [disconnectSafe, ensureGainNode, ensureSpatialNodes, equalizer]);
+
+  const proxyUrl = useCallback((url: string): string => {
+    if (!url || url.startsWith('blob:') || url.startsWith('data:')) return url;
+    return `${API.AUDIO_PROXY}?url=${encodeURIComponent(url)}`;
+  }, []);
 
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
+      audioRef.current.crossOrigin = 'anonymous';
       audioRef.current.volume = volume;
     }
     const audio = audioRef.current;
@@ -362,14 +353,11 @@ export function usePlayer(
     setSongDetail(detail);
 
     if (audioRef.current) {
-      if (webAudioActiveRef.current && !audioRef.current.crossOrigin) {
-        audioRef.current.crossOrigin = 'anonymous';
-      }
-      audioRef.current.src = url;
+      audioRef.current.src = proxyUrl(url);
       audioRef.current.play().catch(() => {});
     }
     setLoading(false);
-  }, [fetchSongUrl, addToast]);
+  }, [fetchSongUrl, addToast, proxyUrl]);
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current) return;

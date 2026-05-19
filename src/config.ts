@@ -4,6 +4,7 @@ export const API = {
   GD: '/api/gd',
   PJMP3: '/api/pjmp3',
   QQ_SEARCH: '/qqapi/soso/fcgi-bin/client_search_cp',
+  AUDIO_PROXY: '/api/audio-proxy',
 } as const;
 
 export const PLATFORMS = [
