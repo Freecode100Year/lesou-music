@@ -193,7 +193,6 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     if (!audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.volume = volume;
-      audioRef.current.crossOrigin = 'anonymous';
     }
     const audio = audioRef.current;
 
@@ -362,6 +361,9 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     setSongDetail(detail);
 
     if (audioRef.current) {
+      if (spatialNodesRef.current && !audioRef.current.crossOrigin) {
+        audioRef.current.crossOrigin = 'anonymous';
+      }
       audioRef.current.src = url;
       audioRef.current.play().catch(() => {});
     }
@@ -401,17 +403,10 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     const next = Math.max(1, Math.min(3, Number.isFinite(gain) ? gain : 1));
     setGainMultiplierState(next);
     saveGainMultiplier(next);
-    if (!gainNodeRef.current && audioRef.current) {
-      if (spatialAudio) {
-        enableSpatial();
-      } else {
-        disableSpatial();
-      }
-    }
     if (gainNodeRef.current) {
       gainNodeRef.current.gain.value = next;
     }
-  }, [disableSpatial, enableSpatial, spatialAudio]);
+  }, []);
 
   const playNext = useCallback(() => {
     if (queue.length === 0) return;
@@ -465,20 +460,42 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     setSpatialAudioState(next);
     saveSpatialAudio(next);
     if (next) {
+      if (audioRef.current && !audioRef.current.crossOrigin) {
+        audioRef.current.crossOrigin = 'anonymous';
+        const src = audioRef.current.src;
+        const time = audioRef.current.currentTime;
+        const wasPlaying = !audioRef.current.paused;
+        if (src) {
+          audioRef.current.src = src;
+          audioRef.current.currentTime = time;
+          if (wasPlaying) audioRef.current.play().catch(() => {});
+        }
+      }
       enableSpatial();
-      addToast('杜比全景声 已开启', 'success');
+      addToast('杜比全景声 已开启（部分音源可能不支持）', 'success');
     } else {
-      disableSpatial();
+      if (spatialNodesRef.current) {
+        disableSpatial();
+      }
       addToast('杜比全景声 已关闭', 'info');
     }
   }, [spatialAudio, enableSpatial, disableSpatial, addToast]);
 
-  // Initialize the Web Audio route on first play.
   useEffect(() => {
     if (!isPlaying) return;
     if (spatialAudio) {
+      if (audioRef.current && !audioRef.current.crossOrigin) {
+        audioRef.current.crossOrigin = 'anonymous';
+        const src = audioRef.current.src;
+        const time = audioRef.current.currentTime;
+        if (src) {
+          audioRef.current.src = src;
+          audioRef.current.currentTime = time;
+          audioRef.current.play().catch(() => {});
+        }
+      }
       enableSpatial();
-    } else {
+    } else if (spatialNodesRef.current) {
       disableSpatial();
     }
   }, [disableSpatial, enableSpatial, isPlaying, spatialAudio]);
