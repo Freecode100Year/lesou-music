@@ -10,11 +10,12 @@ export interface Song {
   sourceType: SourceType;
 }
 
-export type SourceType = 'standard' | 'gd' | 'pjmp3';
+export type SourceType = 'standard' | 'gd' | 'pjmp3' | 'qq';
 export type StandardPlatform = 'wy' | 'kw';
 export type GDSource = 'netease' | 'kuwo';
 export type PjmpSource = 'all';
-export type SongSource = StandardPlatform | GDSource | PjmpSource;
+export type QQSource = 'qq';
+export type SongSource = StandardPlatform | GDSource | PjmpSource | QQSource;
 
 export interface SongDetail {
   url: string;

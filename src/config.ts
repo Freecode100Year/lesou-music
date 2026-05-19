@@ -3,12 +3,14 @@ export const API = {
   SONG: '/api/song',
   GD: '/api/gd',
   PJMP3: '/api/pjmp3',
+  QQ_SEARCH: '/qqapi/soso/fcgi-bin/client_search_cp',
 } as const;
 
 export const PLATFORMS = [
-  { key: 'all', label: '全网', type: 'pjmp3' as const },
+  { key: 'all', label: '全网', type: 'aggregate' as const },
   { key: 'wy', label: '网易云', type: 'standard' as const },
   { key: 'kw', label: '酷我', type: 'standard' as const },
+  { key: 'qq', label: 'QQ音乐', type: 'qq' as const },
 ] as const;
 
 export const CACHE_TTL = {

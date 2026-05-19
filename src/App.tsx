@@ -59,7 +59,22 @@ export default function App() {
       url = cached;
     } else {
       try {
-        if (song.sourceType === 'pjmp3') {
+        if (song.sourceType === 'qq') {
+          const query = `${song.name} ${song.artist}`.trim();
+          for (const plat of ['wy', 'kw']) {
+            const searchRes = await fetch(`${API.SEARCH}?keyword=${encodeURIComponent(query)}&type=${plat}&page=1&limit=5`);
+            const searchData = await searchRes.json();
+            if (searchData.code === 1 && searchData.data?.length > 0) {
+              const match = searchData.data[0];
+              const songRes = await fetch(`${API.SONG}?id=${match.id || match.ID}&type=${plat}`);
+              const songData = await songRes.json();
+              if (songData.code === 1 && songData.data?.url) {
+                url = songData.data.url;
+                break;
+              }
+            }
+          }
+        } else if (song.sourceType === 'pjmp3') {
           const res = await fetch(`${API.PJMP3}?action=song&id=${song.id}`);
           const data = await res.json();
           if (data.code === 1 && data.data) {

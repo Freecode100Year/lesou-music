@@ -53,6 +53,7 @@ export function Player({
       setCoverUrl('');
       return;
     }
+    setCoverUrl('');
     const loadCover = async () => {
       if (currentSong.pic) {
         setCoverUrl(currentSong.pic);
@@ -148,7 +149,7 @@ export function Player({
         <div className="player-left" onClick={onShowLyrics}>
           <div className="player-cover">
             {coverUrl ? (
-              <img src={coverUrl} alt="" />
+              <img src={coverUrl} alt="" onError={() => setCoverUrl('')} />
             ) : (
               <div className="player-cover-placeholder">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" opacity="0.4">

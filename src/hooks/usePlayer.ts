@@ -250,6 +250,39 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     return () => audio.removeEventListener('ended', onEnded);
   }, [playMode, queue, queueIndex]);
 
+  const resolveQQSongUrl = useCallback(async (song: Song): Promise<string | null> => {
+    const query = `${song.name} ${song.artist}`.trim();
+    const platforms: Array<{ type: string; source: string }> = [
+      { type: 'wy', source: 'wy' },
+      { type: 'kw', source: 'kw' },
+    ];
+    for (const plat of platforms) {
+      try {
+        const searchUrl = `${API.SEARCH}?keyword=${encodeURIComponent(query)}&type=${plat.type}&page=1&limit=5`;
+        const searchRes = await fetch(searchUrl);
+        const searchData = await searchRes.json();
+        if (searchData.code === 1 && Array.isArray(searchData.data) && searchData.data.length > 0) {
+          const match = searchData.data[0];
+          const songId = String(match.id || match.ID);
+          const songRes = await fetch(`${API.SONG}?id=${songId}&type=${plat.source}`);
+          const songData = await songRes.json();
+          if (songData.code === 1 && songData.data && songData.data.url) {
+            if (songData.data.pic) {
+              requestCache.set(`pic_${song.sourceType}_${song.source}_${song.id}`, songData.data.pic, CACHE_TTL.PIC);
+            }
+            if (songData.data.lrc) {
+              requestCache.set(`lyric_${song.sourceType}_${song.source}_${song.id}`, songData.data.lrc, CACHE_TTL.LYRIC);
+            }
+            return songData.data.url;
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }, []);
+
   const fetchSongUrl = useCallback(async (song: Song): Promise<string | null> => {
     const cacheKey = `song_url_${song.sourceType}_${song.source}_${song.id}`;
     const cached = requestCache.get<string>(cacheKey);
@@ -258,8 +291,12 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     let retries = 2;
     while (retries >= 0) {
       try {
-        let url: string;
-        if (song.sourceType === 'pjmp3') {
+        let url: string = '';
+
+        if (song.sourceType === 'qq') {
+          const resolved = await resolveQQSongUrl(song);
+          url = resolved || '';
+        } else if (song.sourceType === 'pjmp3') {
           const res = await fetch(`${API.PJMP3}?action=song&id=${song.id}`);
           const data = await res.json();
           if (data.code === 1 && data.data) {
@@ -270,13 +307,11 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
             if (data.data.lrc) {
               requestCache.set(`lyric_${song.sourceType}_${song.source}_${song.id}`, data.data.lrc, CACHE_TTL.LYRIC);
             }
-          } else {
-            url = '';
           }
         } else if (song.sourceType === 'gd') {
           const res = await fetch(`${API.GD}?types=url&source=${song.source}&id=${song.id}&br=320`);
           const data = await res.json();
-          url = data.url;
+          url = data.url || '';
         } else {
           const res = await fetch(`${API.SONG}?id=${song.id}&type=${song.source}`);
           const data = await res.json();
@@ -288,8 +323,6 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
             if (data.data.lrc) {
               requestCache.set(`lyric_${song.sourceType}_${song.source}_${song.id}`, data.data.lrc, CACHE_TTL.LYRIC);
             }
-          } else {
-            url = '';
           }
         }
         if (url) {
@@ -304,7 +337,7 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
       }
     }
     return null;
-  }, []);
+  }, [resolveQQSongUrl]);
 
   const playSong = useCallback(async (song: Song, newQueue?: Song[], index?: number) => {
     setLoading(true);

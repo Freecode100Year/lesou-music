@@ -3,6 +3,15 @@ import { Song } from '../types';
 import { API, CACHE_TTL } from '../config';
 import { requestCache } from '../utils/cache';
 
+const SOURCE_LABELS: Record<string, string> = {
+  wy: '网易云',
+  kw: '酷我',
+  qq: 'QQ',
+  netease: '网易云',
+  kuwo: '酷我',
+  all: '全网',
+};
+
 interface SongRowProps {
   song: Song;
   index: number;
@@ -15,12 +24,14 @@ interface SongRowProps {
 }
 
 export function SongRow({ song, index, isPlaying, isStarred, onPlay, onStar, onAddToQueue, onDownload }: SongRowProps) {
-  const imgRef = useRef<HTMLImageElement>(null);
+  const imgRef = useRef<HTMLDivElement>(null);
   const [imgSrc, setImgSrc] = useState<string>('');
   const [imgLoaded, setImgLoaded] = useState(false);
 
   useEffect(() => {
     if (!song) return;
+    setImgSrc('');
+    setImgLoaded(false);
 
     const loadPic = async () => {
       if (song.pic) {
@@ -81,6 +92,10 @@ export function SongRow({ song, index, isPlaying, isStarred, onPlay, onStar, onA
             src={imgSrc}
             alt=""
             onLoad={() => setImgLoaded(true)}
+            onError={() => {
+              setImgSrc('');
+              setImgLoaded(false);
+            }}
             className={imgLoaded ? 'loaded' : ''}
           />
         ) : (
@@ -117,7 +132,7 @@ export function SongRow({ song, index, isPlaying, isStarred, onPlay, onStar, onA
         </button>
       </div>
       <div className="song-row-source">
-        <span className="source-badge">{song.source}</span>
+        <span className="source-badge">{SOURCE_LABELS[song.source] || song.source}</span>
       </div>
     </div>
   );

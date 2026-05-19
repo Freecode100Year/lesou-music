@@ -9,6 +9,11 @@ export default defineConfig({
         target: 'https://lesou-music.pages.dev',
         changeOrigin: true,
       },
+      '/qqapi': {
+        target: 'https://c.y.qq.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/qqapi/, ''),
+      },
     },
   },
   build: {
