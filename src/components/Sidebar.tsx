@@ -1,14 +1,43 @@
-import React from 'react';
-import { Page } from '../types';
+import React, { useState } from 'react';
+import { Page, UserInfo } from '../types';
 
 interface SidebarProps {
   currentPage: Page;
   setPage: (page: Page) => void;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
+  user: UserInfo | null;
+  onLogin: (username: string) => void;
+  onLogout: () => void;
 }
 
-export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen }: SidebarProps) {
+function SidebarLoginForm({ onLogin }: { onLogin: (username: string) => void }) {
+  const [username, setUsername] = useState('');
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (username.trim()) {
+      onLogin(username.trim());
+      setUsername('');
+    }
+  };
+  return (
+    <form className="sidebar-login-form" onSubmit={handleSubmit}>
+      <input
+        type="text"
+        className="sidebar-login-input"
+        placeholder="输入昵称登录"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        maxLength={20}
+      />
+      <button type="submit" className="sidebar-login-btn" disabled={!username.trim()}>
+        登录
+      </button>
+    </form>
+  );
+}
+
+export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen, user, onLogin, onLogout }: SidebarProps) {
   const navigate = (page: Page) => {
     setPage(page);
     setMobileOpen(false);
@@ -62,6 +91,27 @@ export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen }: Sid
           </button>
         </nav>
 
+        <div className="sidebar-footer">
+          {user ? (
+            <div className="sidebar-user">
+              <div className="sidebar-user-info">
+                <div className="sidebar-user-avatar">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                  </svg>
+                </div>
+                <span className="sidebar-user-name">{user.username}</span>
+              </div>
+              <button className="sidebar-logout-btn" onClick={onLogout} title="退出登录">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <SidebarLoginForm onLogin={onLogin} />
+          )}
+        </div>
       </aside>
     </>
   );

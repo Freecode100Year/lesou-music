@@ -9,6 +9,9 @@ const KEYS = {
   PLAY_MODE: 'xql_play_mode',
   SPATIAL_AUDIO: 'xql_spatial_audio',
   GAIN_MULTIPLIER: 'xql_gain_multiplier',
+  EQ_ENABLED: 'xql_eq_enabled',
+  EQ_GAINS: 'xql_eq_gains',
+  EQ_PRESET: 'xql_eq_preset',
 } as const;
 
 export function getUser(): UserInfo | null {
@@ -97,4 +100,35 @@ export function getGainMultiplier(): number {
 
 export function setGainMultiplier(gain: number): void {
   localStorage.setItem(KEYS.GAIN_MULTIPLIER, String(gain));
+}
+
+export function getEqEnabled(): boolean {
+  return localStorage.getItem(KEYS.EQ_ENABLED) === 'true';
+}
+
+export function setEqEnabled(enabled: boolean): void {
+  localStorage.setItem(KEYS.EQ_ENABLED, String(enabled));
+}
+
+export function getEqGains(): number[] | null {
+  const raw = localStorage.getItem(KEYS.EQ_GAINS);
+  if (!raw) return null;
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) && arr.length === 31 ? arr : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setEqGains(gains: number[]): void {
+  localStorage.setItem(KEYS.EQ_GAINS, JSON.stringify(gains));
+}
+
+export function getEqPreset(): string {
+  return localStorage.getItem(KEYS.EQ_PRESET) || 'flat';
+}
+
+export function setEqPreset(preset: string): void {
+  localStorage.setItem(KEYS.EQ_PRESET, preset);
 }

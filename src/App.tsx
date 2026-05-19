@@ -6,6 +6,7 @@ import { useSearch } from './hooks/useSearch';
 import { useUser } from './hooks/useUser';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useLyrics } from './hooks/useLyrics';
+import { useEqualizer } from './hooks/useEqualizer';
 import { Layout } from './components/Layout';
 import { HomePage } from './components/HomePage';
 import { SearchPage } from './components/SearchPage';
@@ -13,6 +14,7 @@ import { StarredPage } from './components/StarredPage';
 import { Player } from './components/Player';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { QueuePanel } from './components/QueuePanel';
+import { Equalizer } from './components/Equalizer';
 import { Toast } from './components/Toast';
 import { API, CACHE_TTL } from './config';
 import { requestCache } from './utils/cache';
@@ -22,6 +24,7 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showLyrics, setShowLyrics] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
+  const [showEqualizer, setShowEqualizer] = useState(false);
   const [searchFocusTrigger, setSearchFocusTrigger] = useState(0);
 
   const addToast = useCallback((text: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -33,7 +36,8 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const player = usePlayer(addToast);
+  const eq = useEqualizer();
+  const player = usePlayer(addToast, { filtersRef: eq.filtersRef, createFilters: eq.createFilters });
   const searchHook = useSearch();
   const userHook = useUser(addToast);
 
@@ -48,20 +52,10 @@ export default function App() {
   });
 
   const playSongInList = useCallback((song: Song, list: Song[], index: number) => {
-    if (song.sourceType === 'youtube' && song.externalUrl) {
-      window.open(song.externalUrl, '_blank');
-      addToast('已在新标签页打开 YouTube Music', 'info');
-      return;
-    }
     player.playSong(song, list, index);
-  }, [player.playSong, addToast]);
+  }, [player.playSong]);
 
   const handleDownload = useCallback(async (song: Song) => {
-    if (song.sourceType === 'youtube' && song.externalUrl) {
-      window.open(song.externalUrl, '_blank');
-      addToast('已在新标签页打开 YouTube Music', 'info');
-      return;
-    }
     let url = '';
     const cacheKey = `song_url_${song.sourceType}_${song.source}_${song.id}`;
     const cached = requestCache.get<string>(cacheKey);
@@ -117,6 +111,19 @@ export default function App() {
     }
   }, [addToast]);
 
+  const handlePlayAllStarred = useCallback(() => {
+    if (userHook.starred.length === 0) return;
+    player.setPlayMode('sequential');
+    player.playSong(userHook.starred[0], userHook.starred, 0);
+  }, [userHook.starred, player.playSong, player.setPlayMode]);
+
+  const handleShuffleAllStarred = useCallback(() => {
+    if (userHook.starred.length === 0) return;
+    player.setPlayMode('shuffle');
+    const idx = Math.floor(Math.random() * userHook.starred.length);
+    player.playSong(userHook.starred[idx], userHook.starred, idx);
+  }, [userHook.starred, player.playSong, player.setPlayMode]);
+
   const handleSearchFocus = useCallback(() => {
     setCurrentPage('search');
     setSearchFocusTrigger((n) => n + 1);
@@ -125,11 +132,6 @@ export default function App() {
   const handleQueuePlay = useCallback((index: number) => {
     const song = player.queue[index];
     if (song) {
-      if (song.sourceType === 'youtube' && song.externalUrl) {
-        window.open(song.externalUrl, '_blank');
-        addToast('已在新标签页打开 YouTube Music', 'info');
-        return;
-      }
       player.playSong(song, player.queue, index);
     }
   }, [player]);
@@ -155,6 +157,9 @@ export default function App() {
         onSearchFocus={handleSearchFocus}
         gainMultiplier={player.gainMultiplier}
         onSetGainMultiplier={player.setGainMultiplier}
+        user={userHook.user}
+        onLogin={userHook.login}
+        onLogout={userHook.logout}
       >
         {currentPage === 'home' && (
           <HomePage
@@ -197,6 +202,8 @@ export default function App() {
             onStar={userHook.toggleStar}
             onAddToQueue={(song) => player.addToQueue([song])}
             onDownload={handleDownload}
+            onPlayAll={handlePlayAllStarred}
+            onShuffleAll={handleShuffleAllStarred}
           />
         )}
       </Layout>
@@ -219,6 +226,8 @@ export default function App() {
         onPrev={player.playPrev}
         onShowLyrics={() => setShowLyrics(true)}
         onShowQueue={() => setShowQueue(true)}
+        onShowEqualizer={() => setShowEqualizer(true)}
+        eqEnabled={eq.enabled}
       />
 
       <LyricsOverlay
@@ -238,6 +247,23 @@ export default function App() {
         onPlay={handleQueuePlay}
         onRemove={player.removeFromQueue}
         onClear={player.clearQueue}
+      />
+
+      <Equalizer
+        visible={showEqualizer}
+        onClose={() => setShowEqualizer(false)}
+        gains={eq.gains}
+        enabled={eq.enabled}
+        preset={eq.preset}
+        onSetBandGain={eq.setBandGain}
+        onReset={eq.reset}
+        onSetEnabled={(on) => {
+          eq.setEnabled(on);
+          if (on && player.isPlaying) {
+            player.activateWebAudio(player.spatialAudio);
+          }
+        }}
+        onApplyPreset={eq.applyPreset}
       />
 
       <Toast toasts={toasts} removeToast={removeToast} />

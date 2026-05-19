@@ -61,30 +61,6 @@ async function searchQQ(
   return [];
 }
 
-async function searchYouTube(
-  kw: string,
-  pg: number,
-  signal: AbortSignal,
-): Promise<Song[]> {
-  const url = `${API.YOUTUBE_SEARCH}?keyword=${encodeURIComponent(kw)}&page=${pg}&limit=${DEFAULT_LIMIT}`;
-  const res = await fetch(url, { signal });
-  const data = await res.json();
-  if (data.code === 1 && Array.isArray(data.data)) {
-    return data.data.map((item: any) => ({
-      id: item.id || '',
-      name: item.name || '',
-      artist: item.artist || '',
-      album: item.album || '',
-      pic: item.pic || '',
-      duration: item.duration,
-      source: 'ytmusic' as const,
-      sourceType: 'youtube' as const,
-      externalUrl: item.externalUrl || '',
-    }));
-  }
-  return [];
-}
-
 async function searchAggregate(
   kw: string,
   pg: number,
@@ -94,7 +70,6 @@ async function searchAggregate(
     searchStandard(kw, 'wy', pg, signal).catch(() => [] as Song[]),
     searchStandard(kw, 'kw', pg, signal).catch(() => [] as Song[]),
     searchQQ(kw, pg, signal).catch(() => [] as Song[]),
-    searchYouTube(kw, pg, signal).catch(() => [] as Song[]),
   ];
   const results = await Promise.all(searches);
   const merged: Song[] = [];
@@ -156,8 +131,6 @@ export function useSearch() {
           songs = await searchAggregate(kw, pg, abortRef.current.signal);
         } else if (platformInfo.type === 'qq') {
           songs = await searchQQ(kw, pg, abortRef.current.signal);
-        } else if (platformInfo.type === 'youtube') {
-          songs = await searchYouTube(kw, pg, abortRef.current.signal);
         } else {
           songs = await searchStandard(kw, plat, pg, abortRef.current.signal);
         }

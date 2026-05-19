@@ -10,7 +10,6 @@ const SOURCE_LABELS: Record<string, string> = {
   netease: '网易云',
   kuwo: '酷我',
   all: '全网',
-  ytmusic: 'YouTube',
 };
 
 interface SongRowProps {
@@ -24,7 +23,7 @@ interface SongRowProps {
   onDownload: () => void;
 }
 
-export function SongRow({ song, index, isPlaying, isStarred, onPlay, onStar, onAddToQueue, onDownload }: SongRowProps) {
+export const SongRow = React.memo(function SongRow({ song, index, isPlaying, isStarred, onPlay, onStar, onAddToQueue, onDownload }: SongRowProps) {
   const imgRef = useRef<HTMLDivElement>(null);
   const [imgSrc, setImgSrc] = useState<string>('');
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -145,30 +144,20 @@ export function SongRow({ song, index, isPlaying, isStarred, onPlay, onStar, onA
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
         </button>
-        {song.sourceType === 'youtube' ? (
-          <button className="action-btn" onClick={() => song.externalUrl && window.open(song.externalUrl, '_blank')} title="在 YouTube Music 打开">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-              <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
-            </svg>
-          </button>
-        ) : (
-          <>
-            <button className="action-btn" onClick={onAddToQueue} title="添加到队列">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
-              </svg>
-            </button>
-            <button className="action-btn" onClick={onDownload} title="下载">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-              </svg>
-            </button>
-          </>
-        )}
+        <button className="action-btn" onClick={onAddToQueue} title="添加到队列">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
+          </svg>
+        </button>
+        <button className="action-btn" onClick={onDownload} title="下载">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+          </svg>
+        </button>
       </div>
       <div className="song-row-source">
-        <span className={`source-badge${song.sourceType === 'youtube' ? ' source-badge-youtube' : ''}`}>{SOURCE_LABELS[song.source] || song.source}</span>
+        <span className={`source-badge source-badge-${song.source}`}>{SOURCE_LABELS[song.source] || song.source}</span>
       </div>
     </div>
   );
-}
+});

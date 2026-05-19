@@ -3,14 +3,23 @@ import { Song, SongDetail, PlayMode } from '../types';
 import { API, CACHE_TTL } from '../config';
 import { requestCache } from '../utils/cache';
 import { getVolume, setVolume as saveVolume, getPlayMode, setPlayMode as savePlayMode, getSpatialAudio, setSpatialAudio as saveSpatialAudio, getGainMultiplier, setGainMultiplier as saveGainMultiplier } from '../utils/storage';
-import { shuffleArray } from '../utils/format';
 
-export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 'info') => void) {
+interface EqualizerBridge {
+  filtersRef: React.MutableRefObject<BiquadFilterNode[]>;
+  createFilters: (ctx: AudioContext) => BiquadFilterNode[];
+}
+
+export function usePlayer(
+  addToast: (text: string, type?: 'success' | 'error' | 'info') => void,
+  equalizer: EqualizerBridge,
+) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const webAudioActiveRef = useRef(false);
+  const mediaActionsRef = useRef<{ next: () => void; prev: () => void }>({ next: () => {}, prev: () => {} });
   const spatialNodesRef = useRef<{
-    source: MediaElementAudioSourceNode;
     splitter: ChannelSplitterNode;
     merger: ChannelMergerNode;
     delayL: DelayNode;
@@ -39,12 +48,8 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
   const [queueIndex, setQueueIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
 
-  const disconnectNode = useCallback((node: AudioNode) => {
-    try {
-      node.disconnect();
-    } catch {
-      // Node may already be disconnected.
-    }
+  const disconnectSafe = useCallback((node: AudioNode) => {
+    try { node.disconnect(); } catch {}
   }, []);
 
   const ensureGainNode = useCallback((ctx: AudioContext) => {
@@ -55,30 +60,21 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     return gainNodeRef.current;
   }, [gainMultiplier]);
 
-  const createSpatialNodes = useCallback((ctx: AudioContext, audio: HTMLAudioElement, gainNode: GainNode) => {
-    const source = ctx.createMediaElementSource(audio);
+  const ensureSpatialNodes = useCallback((ctx: AudioContext) => {
+    if (spatialNodesRef.current) return spatialNodesRef.current;
+
     const splitter = ctx.createChannelSplitter(2);
     const merger = ctx.createChannelMerger(2);
-
-    // Stereo widening via micro-delays
     const delayL = ctx.createDelay(0.05);
     const delayR = ctx.createDelay(0.05);
     delayL.delayTime.value = 0.0003;
     delayR.delayTime.value = 0.0007;
 
-    // Channel gains
-    const gainL = ctx.createGain();
-    const gainR = ctx.createGain();
-    gainL.gain.value = 1.0;
-    gainR.gain.value = 1.0;
+    const gainL = ctx.createGain(); gainL.gain.value = 1.0;
+    const gainR = ctx.createGain(); gainR.gain.value = 1.0;
+    const crossL = ctx.createGain(); crossL.gain.value = -0.15;
+    const crossR = ctx.createGain(); crossR.gain.value = -0.15;
 
-    // Cross-feed for immersion
-    const crossL = ctx.createGain();
-    const crossR = ctx.createGain();
-    crossL.gain.value = -0.15;
-    crossR.gain.value = -0.15;
-
-    // Room reverb simulation
     const convolver = ctx.createConvolver();
     const length = ctx.sampleRate * 1.2;
     const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
@@ -90,104 +86,111 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     }
     convolver.buffer = impulse;
 
-    const wetGain = ctx.createGain();
-    const dryGain = ctx.createGain();
-    wetGain.gain.value = 0.08;
-    dryGain.gain.value = 1.0;
+    const wetGain = ctx.createGain(); wetGain.gain.value = 0.08;
+    const dryGain = ctx.createGain(); dryGain.gain.value = 1.0;
 
-    // Bass enhancement
     const bassBoost = ctx.createBiquadFilter();
     bassBoost.type = 'lowshelf';
     bassBoost.frequency.value = 150;
     bassBoost.gain.value = 3;
 
-    const output = ctx.createGain();
-    output.gain.value = 1.0;
-
-    // Routing: source → splitter → delays → gains + cross-feed → merger → bass → dry/wet → output
-    source.connect(splitter);
+    const output = ctx.createGain(); output.gain.value = 1.0;
 
     splitter.connect(delayL, 0);
     splitter.connect(delayR, 1);
-
     delayL.connect(gainL);
     delayR.connect(gainR);
-
-    // Cross-feed: R into L, L into R
     delayL.connect(crossR);
     delayR.connect(crossL);
-
     gainL.connect(merger, 0, 0);
     gainR.connect(merger, 0, 1);
     crossL.connect(merger, 0, 0);
     crossR.connect(merger, 0, 1);
-
     merger.connect(bassBoost);
     bassBoost.connect(dryGain);
     bassBoost.connect(convolver);
     convolver.connect(wetGain);
-
     dryGain.connect(output);
     wetGain.connect(output);
-    output.connect(gainNode);
 
-    return { source, splitter, merger, delayL, delayR, gainL, gainR, crossL, crossR, convolver, wetGain, dryGain, bassBoost, output };
+    const nodes = { splitter, merger, delayL, delayR, gainL, gainR, crossL, crossR, convolver, wetGain, dryGain, bassBoost, output };
+    spatialNodesRef.current = nodes;
+    return nodes;
   }, []);
 
-  const ensureAudioGraph = useCallback(() => {
-    if (!audioRef.current) return null;
-    try {
-      const ctx = audioCtxRef.current || new AudioContext();
-      audioCtxRef.current = ctx;
-      const gainNode = ensureGainNode(ctx);
-      if (!spatialNodesRef.current) {
-        spatialNodesRef.current = createSpatialNodes(ctx, audioRef.current, gainNode);
-      }
-      return { ctx, gainNode, nodes: spatialNodesRef.current };
-    } catch {
-      return null;
+  const ensureCrossOrigin = useCallback(() => {
+    if (!audioRef.current || audioRef.current.crossOrigin) return;
+    audioRef.current.crossOrigin = 'anonymous';
+    const src = audioRef.current.src;
+    const time = audioRef.current.currentTime;
+    const wasPlaying = !audioRef.current.paused;
+    if (src) {
+      audioRef.current.src = src;
+      audioRef.current.currentTime = time;
+      if (wasPlaying) audioRef.current.play().catch(() => {});
     }
-  }, [createSpatialNodes, ensureGainNode]);
+  }, []);
 
-  const connectGainToDestination = useCallback((ctx: AudioContext, gainNode: GainNode) => {
-    disconnectNode(gainNode);
+  const activateWebAudio = useCallback((useSpatial: boolean) => {
+    if (!audioRef.current) return;
+
+    ensureCrossOrigin();
+
+    let ctx = audioCtxRef.current;
+    if (!ctx) {
+      ctx = new AudioContext();
+      audioCtxRef.current = ctx;
+    }
+
+    if (!sourceNodeRef.current) {
+      try {
+        sourceNodeRef.current = ctx.createMediaElementSource(audioRef.current);
+      } catch {
+        return;
+      }
+    }
+
+    const source = sourceNodeRef.current;
+    const gainNode = ensureGainNode(ctx);
+
+    const eqFilters = equalizer.filtersRef.current.length > 0
+      ? equalizer.filtersRef.current
+      : equalizer.createFilters(ctx);
+
+    const eqFirst = eqFilters[0];
+    const eqLast = eqFilters[eqFilters.length - 1];
+
+    disconnectSafe(source);
+    if (eqLast) disconnectSafe(eqLast);
+    disconnectSafe(gainNode);
+    if (spatialNodesRef.current) {
+      disconnectSafe(spatialNodesRef.current.output);
+    }
+
+    source.connect(eqFirst);
+
+    if (useSpatial) {
+      const spatial = ensureSpatialNodes(ctx);
+      eqLast.connect(spatial.splitter);
+      spatial.output.connect(gainNode);
+      spatial.wetGain.gain.value = 0.08;
+      spatial.crossL.gain.value = -0.15;
+      spatial.crossR.gain.value = -0.15;
+      spatial.bassBoost.gain.value = 3;
+    } else {
+      eqLast.connect(gainNode);
+      if (spatialNodesRef.current) {
+        spatialNodesRef.current.wetGain.gain.value = 0;
+        spatialNodesRef.current.crossL.gain.value = 0;
+        spatialNodesRef.current.crossR.gain.value = 0;
+        spatialNodesRef.current.bassBoost.gain.value = 0;
+      }
+    }
+
     gainNode.connect(ctx.destination);
-  }, [disconnectNode]);
-
-  const enableSpatial = useCallback(() => {
-    const graph = ensureAudioGraph();
-    if (!graph) return;
-
-    const { ctx, gainNode, nodes } = graph;
-    disconnectNode(nodes.source);
-    disconnectNode(nodes.output);
-    nodes.source.connect(nodes.splitter);
-    nodes.output.connect(gainNode);
-    connectGainToDestination(ctx, gainNode);
-    nodes.wetGain.gain.value = 0.08;
-    nodes.crossL.gain.value = -0.15;
-    nodes.crossR.gain.value = -0.15;
-    nodes.bassBoost.gain.value = 3;
-
+    webAudioActiveRef.current = true;
     ctx.resume().catch(() => {});
-  }, [connectGainToDestination, disconnectNode, ensureAudioGraph]);
-
-  const disableSpatial = useCallback(() => {
-    const graph = ensureAudioGraph();
-    if (!graph) return;
-
-    const { ctx, gainNode, nodes } = graph;
-    disconnectNode(nodes.source);
-    disconnectNode(nodes.output);
-    nodes.source.connect(gainNode);
-    connectGainToDestination(ctx, gainNode);
-    nodes.wetGain.gain.value = 0;
-    nodes.crossL.gain.value = 0;
-    nodes.crossR.gain.value = 0;
-    nodes.bassBoost.gain.value = 0;
-
-    ctx.resume().catch(() => {});
-  }, [connectGainToDestination, disconnectNode, ensureAudioGraph]);
+  }, [disconnectSafe, ensureCrossOrigin, ensureGainNode, ensureSpatialNodes, equalizer]);
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -283,8 +286,6 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
   }, []);
 
   const fetchSongUrl = useCallback(async (song: Song): Promise<string | null> => {
-    if (song.sourceType === 'youtube') return null;
-
     const cacheKey = `song_url_${song.sourceType}_${song.source}_${song.id}`;
     const cached = requestCache.get<string>(cacheKey);
     if (cached) return cached;
@@ -361,7 +362,7 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     setSongDetail(detail);
 
     if (audioRef.current) {
-      if (spatialNodesRef.current && !audioRef.current.crossOrigin) {
+      if (webAudioActiveRef.current && !audioRef.current.crossOrigin) {
         audioRef.current.crossOrigin = 'anonymous';
       }
       audioRef.current.src = url;
@@ -432,6 +433,8 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     playSong(queue[prevIndex], queue, prevIndex);
   }, [queue, queueIndex, playMode, playSong]);
 
+  useEffect(() => { mediaActionsRef.current = { next: playNext, prev: playPrev }; }, [playNext, playPrev]);
+
   const addToQueue = useCallback((songs: Song[]) => {
     setQueue((prev) => [...prev, ...songs]);
     addToast(`已添加 ${songs.length} 首到队列`, 'success');
@@ -460,45 +463,24 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     setSpatialAudioState(next);
     saveSpatialAudio(next);
     if (next) {
-      if (audioRef.current && !audioRef.current.crossOrigin) {
-        audioRef.current.crossOrigin = 'anonymous';
-        const src = audioRef.current.src;
-        const time = audioRef.current.currentTime;
-        const wasPlaying = !audioRef.current.paused;
-        if (src) {
-          audioRef.current.src = src;
-          audioRef.current.currentTime = time;
-          if (wasPlaying) audioRef.current.play().catch(() => {});
-        }
-      }
-      enableSpatial();
+      activateWebAudio(true);
       addToast('杜比全景声 已开启（部分音源可能不支持）', 'success');
     } else {
-      if (spatialNodesRef.current) {
-        disableSpatial();
+      if (webAudioActiveRef.current) {
+        activateWebAudio(false);
       }
       addToast('杜比全景声 已关闭', 'info');
     }
-  }, [spatialAudio, enableSpatial, disableSpatial, addToast]);
+  }, [spatialAudio, activateWebAudio, addToast]);
 
+  // Rebuild audio routing when playback starts or EQ/spatial state changes
   useEffect(() => {
     if (!isPlaying) return;
-    if (spatialAudio) {
-      if (audioRef.current && !audioRef.current.crossOrigin) {
-        audioRef.current.crossOrigin = 'anonymous';
-        const src = audioRef.current.src;
-        const time = audioRef.current.currentTime;
-        if (src) {
-          audioRef.current.src = src;
-          audioRef.current.currentTime = time;
-          audioRef.current.play().catch(() => {});
-        }
-      }
-      enableSpatial();
-    } else if (spatialNodesRef.current) {
-      disableSpatial();
+    const needWebAudio = spatialAudio || equalizer.filtersRef.current.length > 0;
+    if (needWebAudio || webAudioActiveRef.current) {
+      activateWebAudio(spatialAudio);
     }
-  }, [disableSpatial, enableSpatial, isPlaying, spatialAudio]);
+  }, [isPlaying, spatialAudio, activateWebAudio, equalizer]);
 
   const preloadNext = useCallback(() => {
     if (queue.length === 0) return;
@@ -514,6 +496,28 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
       preloadNext();
     }
   }, [currentTime, duration, preloadNext]);
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.setActionHandler('play', () => audioRef.current?.play().catch(() => {}));
+    navigator.mediaSession.setActionHandler('pause', () => audioRef.current?.pause());
+    navigator.mediaSession.setActionHandler('previoustrack', () => mediaActionsRef.current.prev());
+    navigator.mediaSession.setActionHandler('nexttrack', () => mediaActionsRef.current.next());
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (audioRef.current && details.seekTime != null) {
+        audioRef.current.currentTime = details.seekTime;
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !currentSong) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentSong.name,
+      artist: currentSong.artist,
+      album: currentSong.album || '',
+    });
+  }, [currentSong]);
 
   return {
     currentSong,
@@ -540,5 +544,6 @@ export function usePlayer(addToast: (text: string, type?: 'success' | 'error' | 
     addToQueue,
     removeFromQueue,
     clearQueue,
+    activateWebAudio,
   };
 }

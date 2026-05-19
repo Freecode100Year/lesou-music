@@ -22,6 +22,8 @@ interface PlayerProps {
   onPrev: () => void;
   onShowLyrics: () => void;
   onShowQueue: () => void;
+  onShowEqualizer: () => void;
+  eqEnabled: boolean;
 }
 
 export function Player({
@@ -42,9 +44,13 @@ export function Player({
   onPrev,
   onShowLyrics,
   onShowQueue,
+  onShowEqualizer,
+  eqEnabled,
 }: PlayerProps) {
   const [coverUrl, setCoverUrl] = useState('');
   const [showVolume, setShowVolume] = useState(false);
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [hoverPos, setHoverPos] = useState(0);
   const progressRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
 
@@ -102,9 +108,17 @@ export function Player({
   const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!progressRef.current || !duration) return;
     const rect = progressRef.current.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     onSeek(ratio * duration);
   }, [duration, onSeek]);
+
+  const handleProgressHover = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!progressRef.current || !duration) return;
+    const rect = progressRef.current.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    setHoverTime(ratio * duration);
+    setHoverPos(ratio * 100);
+  }, [duration]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -159,8 +173,21 @@ export function Player({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="player-progress" ref={progressRef} onClick={handleProgressClick}>
-        <div className="player-progress-bar" style={{ width: `${progress}%` }} />
+      <div
+        className="player-progress"
+        ref={progressRef}
+        onClick={handleProgressClick}
+        onMouseMove={handleProgressHover}
+        onMouseLeave={() => setHoverTime(null)}
+      >
+        <div className="player-progress-bar" style={{ width: `${progress}%` }}>
+          <div className="player-progress-thumb" />
+        </div>
+        {hoverTime !== null && (
+          <div className="player-progress-tooltip" style={{ left: `${hoverPos}%` }}>
+            {formatTime(hoverTime)}
+          </div>
+        )}
       </div>
 
       <div className="player-content">
@@ -223,6 +250,15 @@ export function Player({
               <path d="M12 3v18c-5-2-8-6-8-9s3-7 8-9z" opacity={spatialAudio ? 1 : 0.4} />
               <path d="M14 5.5c3 1.5 5 4.5 5 6.5s-2 5-5 6.5" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={spatialAudio ? 1 : 0.3} />
               <path d="M16 3.5c4 2 6.5 5.5 6.5 8.5s-2.5 6.5-6.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={spatialAudio ? 1 : 0.3} />
+            </svg>
+          </button>
+          <button
+            className={`player-btn eq-btn ${eqEnabled ? 'active' : ''}`}
+            onClick={onShowEqualizer}
+            title="均衡器"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" opacity={eqEnabled ? 1 : 0.5}>
+              <path d="M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z" />
             </svg>
           </button>
         </div>
