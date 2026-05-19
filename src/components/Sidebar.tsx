@@ -1,43 +1,107 @@
 import React, { useState } from 'react';
 import { Page, UserInfo } from '../types';
 
+const ALPHANUMERIC = /^[a-zA-Z0-9]+$/;
+
 interface SidebarProps {
   currentPage: Page;
   setPage: (page: Page) => void;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
   user: UserInfo | null;
-  onLogin: (username: string) => void;
+  onLogin: (username: string, password: string) => boolean;
+  onRegister: (username: string, password: string) => boolean;
   onLogout: () => void;
 }
 
-function SidebarLoginForm({ onLogin }: { onLogin: (username: string) => void }) {
+function SidebarAuthForm({ onLogin, onRegister }: {
+  onLogin: (username: string, password: string) => boolean;
+  onRegister: (username: string, password: string) => boolean;
+}) {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const validate = (): string => {
+    if (!username) return '请输入用户名';
+    if (!ALPHANUMERIC.test(username)) return '用户名仅支持英文字母和数字';
+    if (username.length < 2) return '用户名至少 2 个字符';
+    if (!password) return '请输入密码';
+    if (!ALPHANUMERIC.test(password)) return '密码仅支持英文字母和数字';
+    if (password.length < 4) return '密码至少 4 个字符';
+    return '';
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim()) {
-      onLogin(username.trim());
+    const err = validate();
+    if (err) { setError(err); return; }
+    setError('');
+    const ok = mode === 'register'
+      ? onRegister(username, password)
+      : onLogin(username, password);
+    if (ok) {
       setUsername('');
+      setPassword('');
     }
   };
+
+  const handleUsernameChange = (v: string) => {
+    setUsername(v);
+    if (error) setError('');
+  };
+
+  const handlePasswordChange = (v: string) => {
+    setPassword(v);
+    if (error) setError('');
+  };
+
   return (
-    <form className="sidebar-login-form" onSubmit={handleSubmit}>
+    <form className="sidebar-auth-form" onSubmit={handleSubmit}>
+      <div className="sidebar-auth-tabs">
+        <button
+          type="button"
+          className={`sidebar-auth-tab ${mode === 'login' ? 'active' : ''}`}
+          onClick={() => { setMode('login'); setError(''); }}
+        >
+          登录
+        </button>
+        <button
+          type="button"
+          className={`sidebar-auth-tab ${mode === 'register' ? 'active' : ''}`}
+          onClick={() => { setMode('register'); setError(''); }}
+        >
+          注册
+        </button>
+      </div>
       <input
         type="text"
-        className="sidebar-login-input"
-        placeholder="输入昵称登录"
+        className="sidebar-auth-input"
+        placeholder="用户名（字母/数字）"
         value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        onChange={(e) => handleUsernameChange(e.target.value)}
         maxLength={20}
+        autoComplete="username"
       />
-      <button type="submit" className="sidebar-login-btn" disabled={!username.trim()}>
-        登录
+      <input
+        type="password"
+        className="sidebar-auth-input"
+        placeholder="密码（字母/数字）"
+        value={password}
+        onChange={(e) => handlePasswordChange(e.target.value)}
+        maxLength={20}
+        autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+      />
+      {error && <div className="sidebar-auth-error">{error}</div>}
+      <button type="submit" className="sidebar-auth-submit">
+        {mode === 'register' ? '注册' : '登录'}
       </button>
     </form>
   );
 }
 
-export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen, user, onLogin, onLogout }: SidebarProps) {
+export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen, user, onLogin, onRegister, onLogout }: SidebarProps) {
   const navigate = (page: Page) => {
     setPage(page);
     setMobileOpen(false);
@@ -109,7 +173,7 @@ export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen, user,
               </button>
             </div>
           ) : (
-            <SidebarLoginForm onLogin={onLogin} />
+            <SidebarAuthForm onLogin={onLogin} onRegister={onRegister} />
           )}
         </div>
       </aside>

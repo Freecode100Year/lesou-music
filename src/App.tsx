@@ -159,6 +159,7 @@ export default function App() {
         onSetGainMultiplier={player.setGainMultiplier}
         user={userHook.user}
         onLogin={userHook.login}
+        onRegister={userHook.register}
         onLogout={userHook.logout}
       >
         {currentPage === 'home' && (

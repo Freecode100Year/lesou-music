@@ -212,15 +212,39 @@ a {
   background: var(--bg-hover);
 }
 
-.sidebar-login-form {
+.sidebar-auth-form {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 0 6px;
 }
 
-.sidebar-login-input {
+.sidebar-auth-tabs {
+  display: flex;
+  gap: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.sidebar-auth-tab {
   flex: 1;
-  min-width: 0;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  transition: all var(--transition);
+}
+
+.sidebar-auth-tab.active {
+  background: var(--primary);
+  color: white;
+}
+
+.sidebar-auth-input {
+  width: 100%;
   padding: 8px 10px;
   background: var(--bg-input);
   border: 1px solid var(--border);
@@ -230,32 +254,32 @@ a {
   transition: border-color var(--transition);
 }
 
-.sidebar-login-input:focus {
+.sidebar-auth-input:focus {
   border-color: var(--primary);
 }
 
-.sidebar-login-input::placeholder {
+.sidebar-auth-input::placeholder {
   color: var(--text-dim);
 }
 
-.sidebar-login-btn {
-  padding: 8px 12px;
+.sidebar-auth-error {
+  font-size: 11px;
+  color: var(--primary);
+  padding: 0 2px;
+}
+
+.sidebar-auth-submit {
+  padding: 8px 0;
   background: var(--primary);
   color: white;
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
   transition: background var(--transition);
-  white-space: nowrap;
 }
 
-.sidebar-login-btn:hover {
+.sidebar-auth-submit:hover {
   background: var(--primary-hover);
-}
-
-.sidebar-login-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* ==================== TOPBAR ==================== */

@@ -1,16 +1,33 @@
 import { useState, useCallback } from 'react';
 import { Song, UserInfo } from '../types';
-import { getUser, setUser as saveUser, getStarred, setStarred } from '../utils/storage';
+import { getUser, setUser as saveUser, getStarred, setStarred, registerAccount, authenticateAccount } from '../utils/storage';
 
 export function useUser(addToast: (text: string, type?: 'success' | 'error' | 'info') => void) {
   const [user, setUserState] = useState<UserInfo | null>(getUser());
   const [starred, setStarredState] = useState<Song[]>(getStarred());
 
-  const login = useCallback((username: string) => {
+  const register = useCallback((username: string, password: string): boolean => {
+    if (!registerAccount(username, password)) {
+      addToast('用户名已被注册', 'error');
+      return false;
+    }
+    const userInfo: UserInfo = { username };
+    setUserState(userInfo);
+    saveUser(userInfo);
+    addToast(`注册成功，欢迎 ${username}`, 'success');
+    return true;
+  }, [addToast]);
+
+  const login = useCallback((username: string, password: string): boolean => {
+    if (!authenticateAccount(username, password)) {
+      addToast('用户名或密码错误', 'error');
+      return false;
+    }
     const userInfo: UserInfo = { username };
     setUserState(userInfo);
     saveUser(userInfo);
     addToast(`欢迎回来，${username}`, 'success');
+    return true;
   }, [addToast]);
 
   const logout = useCallback(() => {
@@ -42,6 +59,7 @@ export function useUser(addToast: (text: string, type?: 'success' | 'error' | 'i
   return {
     user,
     starred,
+    register,
     login,
     logout,
     toggleStar,
