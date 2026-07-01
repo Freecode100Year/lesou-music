@@ -192,7 +192,6 @@ export function usePlayer(
 
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onDurationChange = () => setDuration(audio.duration || 0);
-    const onEnded = () => handleEnded();
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onError = () => {
@@ -202,7 +201,6 @@ export function usePlayer(
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('durationchange', onDurationChange);
-    audio.addEventListener('ended', onEnded);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('error', onError);
@@ -210,38 +208,13 @@ export function usePlayer(
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('durationchange', onDurationChange);
-      audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('error', onError);
     };
   }, []);
 
-  const handleEnded = useCallback(() => {
-    if (playMode === 'repeat-one') {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play();
-      }
-    } else {
-      playNext();
-    }
-  }, [playMode, queue, queueIndex]);
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onEnded = () => {
-      if (playMode === 'repeat-one') {
-        audio.currentTime = 0;
-        audio.play();
-      } else {
-        playNext();
-      }
-    };
-    audio.addEventListener('ended', onEnded);
-    return () => audio.removeEventListener('ended', onEnded);
-  }, [playMode, queue, queueIndex]);
 
   const resolveQQSongUrl = useCallback(async (song: Song): Promise<string | null> => {
     const query = `${song.name} ${song.artist}`.trim();
@@ -422,6 +395,21 @@ export function usePlayer(
   }, [queue, queueIndex, playMode, playSong]);
 
   useEffect(() => { mediaActionsRef.current = { next: playNext, prev: playPrev }; }, [playNext, playPrev]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onEnded = () => {
+      if (playMode === 'repeat-one') {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      } else {
+        playNext();
+      }
+    };
+    audio.addEventListener('ended', onEnded);
+    return () => audio.removeEventListener('ended', onEnded);
+  }, [playMode, playNext]);
 
   const addToQueue = useCallback((songs: Song[]) => {
     setQueue((prev) => [...prev, ...songs]);
