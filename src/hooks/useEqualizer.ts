@@ -133,6 +133,19 @@ const DEFAULT_GAINS = Array(31).fill(0);
 const SKIRT_1 = 0.22;
 const SKIRT_2 = 0.06;
 
+// The skirt estimate tracks the real cascade to within 0.15 dB across every
+// preset, but it can land just under; half a dB of margin keeps even the
+// heaviest curve from touching full scale on its own. Only applied when
+// something is actually boosted, so a flat EQ stays at unity.
+const PREAMP_SAFETY_DB = 0.5;
+
+export function preampGainFor(gains: number[], isEnabled: boolean): number {
+  if (!isEnabled) return 1;
+  const boost = estimatePeakBoostDb(gains);
+  if (boost <= 0) return 1;
+  return Math.pow(10, -(boost + PREAMP_SAFETY_DB) / 20);
+}
+
 export function estimatePeakBoostDb(gains: number[]): number {
   let peak = 0;
   for (let i = 0; i < gains.length; i++) {
@@ -159,9 +172,7 @@ export function useEqualizer() {
   const applyPreamp = useCallback((activeGains: number[], isEnabled: boolean) => {
     const node = preampRef.current;
     if (!node) return;
-    const boost = isEnabled ? estimatePeakBoostDb(activeGains) : 0;
-    const target = Math.pow(10, -Math.max(0, boost) / 20);
-    node.gain.setTargetAtTime(target, node.context.currentTime, 0.03);
+    node.gain.setTargetAtTime(preampGainFor(activeGains, isEnabled), node.context.currentTime, 0.03);
   }, []);
 
   const createFilters = useCallback((ctx: AudioContext): BiquadFilterNode[] => {
@@ -189,9 +200,7 @@ export function useEqualizer() {
   const createPreamp = useCallback((ctx: AudioContext): GainNode => {
     if (!preampRef.current) {
       const node = ctx.createGain();
-      const isEnabled = getEqEnabled();
-      const boost = isEnabled ? estimatePeakBoostDb(getEqGains() || DEFAULT_GAINS) : 0;
-      node.gain.value = Math.pow(10, -Math.max(0, boost) / 20);
+      node.gain.value = preampGainFor(getEqGains() || DEFAULT_GAINS, getEqEnabled());
       preampRef.current = node;
     }
     return preampRef.current;

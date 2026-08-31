@@ -1,3 +1,8 @@
 node_modules
 dist
 .wrangler
+
+# 误落在本目录的通用 loop agent 脚手架，与本项目无关
+00_Loop_Memory
+prompts
+loop-runner.sh

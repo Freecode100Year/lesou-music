@@ -31,10 +31,22 @@ const CROSSFEED_ORDER: CrossfeedMode[] = ['off', 'light', 'medium', 'strong'];
 // Bauer/Meier crossfeed settings. A lower corner and a hotter cross feed the far
 // ear more, which pulls a hard-panned mix further out of the middle of the head
 // at the cost of some width.
-const CROSSFEED_PARAMS: Record<Exclude<CrossfeedMode, 'off'>, { cutoff: number; level: number }> = {
-  light: { cutoff: 800, level: 0.25 },
-  medium: { cutoff: 700, level: 0.40 },
-  strong: { cutoff: 620, level: 0.55 },
+//
+// compFreq/compDb undo the centre-image boost that adding a cross copy causes.
+// The obvious choice - a shelf of -20*log10(1+level) sitting on the direct path
+// at the crossfeed corner - is wrong: the lowpass contributes ~90 degrees of
+// phase at its corner, so direct and cross do not add arithmetically there, and
+// the centre image ends up with 1.5 to 4 dB of ripple right through the vocal
+// range. Compensating the merged output instead, with a shelf whose corner and
+// depth were solved numerically per mode, holds the ripple to 0.5-1.1 dB.
+// See scripts/verify-audio-chain.mjs.
+const CROSSFEED_PARAMS: Record<
+  Exclude<CrossfeedMode, 'off'>,
+  { cutoff: number; level: number; compFreq: number; compDb: number }
+> = {
+  light: { cutoff: 800, level: 0.25, compFreq: 520, compDb: -2.35 },
+  medium: { cutoff: 700, level: 0.40, compFreq: 470, compDb: -3.65 },
+  strong: { cutoff: 620, level: 0.55, compFreq: 430, compDb: -4.80 },
 };
 
 // De-esser crossover. An in-ear seals the canal, which moves its main resonance
@@ -86,12 +98,11 @@ export function usePlayer(
   const crossfeedRef = useRef<{
     splitter: ChannelSplitterNode;
     merger: ChannelMergerNode;
-    directL: BiquadFilterNode;
-    directR: BiquadFilterNode;
     lpL: BiquadFilterNode;
     lpR: BiquadFilterNode;
     crossL: GainNode;
     crossR: GainNode;
+    comp: BiquadFilterNode;
     output: GainNode;
   } | null>(null);
   const deEsserRef = useRef<{
@@ -224,17 +235,10 @@ export function usePlayer(
     const splitter = ctx.createChannelSplitter(2);
     const merger = ctx.createChannelMerger(2);
 
-    // Direct path carries the shelf compensation and, crucially, no delay - so
-    // the stereo image stays centred instead of being shoved to one side.
-    const makeShelf = () => {
-      const f = ctx.createBiquadFilter();
-      f.type = 'lowshelf';
-      f.frequency.value = CROSSFEED_PARAMS.medium.cutoff;
-      f.gain.value = 0;
-      return f;
-    };
-    const directL = makeShelf();
-    const directR = makeShelf();
+    // Direct path is a straight wire - no filtering, and above all no delay, or
+    // the whole stereo image shifts to one side.
+    splitter.connect(merger, 0, 0);
+    splitter.connect(merger, 1, 1);
 
     // No explicit delay line: a 2nd-order lowpass at this corner already carries
     // ~330 us of group delay in its passband, which is the real acoustic path
@@ -249,18 +253,12 @@ export function usePlayer(
     const lpL = makeLowpass();
     const lpR = makeLowpass();
 
+    // In phase. A negative cross gain would cancel the centre image, which is
+    // where the vocal and the bass live.
     const crossL = ctx.createGain();
     const crossR = ctx.createGain();
     crossL.gain.value = 0;
     crossR.gain.value = 0;
-
-    const output = ctx.createGain();
-    output.gain.value = 1.0;
-
-    splitter.connect(directL, 0);
-    splitter.connect(directR, 1);
-    directL.connect(merger, 0, 0);
-    directR.connect(merger, 0, 1);
 
     // L -> lowpass -> opposite ear, and mirrored.
     splitter.connect(lpL, 0);
@@ -271,9 +269,20 @@ export function usePlayer(
     lpR.connect(crossR);
     crossR.connect(merger, 0, 0);
 
-    merger.connect(output);
+    // Centre-image compensation, applied to the sum rather than to the direct
+    // path - see CROSSFEED_PARAMS.
+    const comp = ctx.createBiquadFilter();
+    comp.type = 'lowshelf';
+    comp.frequency.value = CROSSFEED_PARAMS.medium.compFreq;
+    comp.gain.value = 0;
 
-    const nodes = { splitter, merger, directL, directR, lpL, lpR, crossL, crossR, output };
+    const output = ctx.createGain();
+    output.gain.value = 1.0;
+
+    merger.connect(comp);
+    comp.connect(output);
+
+    const nodes = { splitter, merger, lpL, lpR, crossL, crossR, comp, output };
     crossfeedRef.current = nodes;
     return nodes;
   }, []);
@@ -282,27 +291,20 @@ export function usePlayer(
     const nodes = crossfeedRef.current;
     const ctx = audioCtxRef.current;
     if (!nodes || !ctx) return;
+    const t = ctx.currentTime;
     if (mode === 'off') {
-      nodes.crossL.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
-      nodes.crossR.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
-      nodes.directL.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
-      nodes.directR.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
+      nodes.crossL.gain.setTargetAtTime(0, t, 0.02);
+      nodes.crossR.gain.setTargetAtTime(0, t, 0.02);
+      nodes.comp.gain.setTargetAtTime(0, t, 0.02);
       return;
     }
-    const { cutoff, level } = CROSSFEED_PARAMS[mode];
-    // Adding a cross copy lifts correlated (centre) content by (1 + level).
-    // Cutting the direct path by the same amount below the crossfeed corner only
-    // keeps the response flat; a flat gain would drag the whole top end down too.
-    const compDb = -20 * Math.log10(1 + level);
-    const t = ctx.currentTime;
+    const { cutoff, level, compFreq, compDb } = CROSSFEED_PARAMS[mode];
     nodes.lpL.frequency.setTargetAtTime(cutoff, t, 0.02);
     nodes.lpR.frequency.setTargetAtTime(cutoff, t, 0.02);
-    nodes.directL.frequency.setTargetAtTime(cutoff, t, 0.02);
-    nodes.directR.frequency.setTargetAtTime(cutoff, t, 0.02);
-    nodes.directL.gain.setTargetAtTime(compDb, t, 0.02);
-    nodes.directR.gain.setTargetAtTime(compDb, t, 0.02);
     nodes.crossL.gain.setTargetAtTime(level, t, 0.02);
     nodes.crossR.gain.setTargetAtTime(level, t, 0.02);
+    nodes.comp.frequency.setTargetAtTime(compFreq, t, 0.02);
+    nodes.comp.gain.setTargetAtTime(compDb, t, 0.02);
   }, []);
 
   // Band-split de-esser. A Linkwitz-Riley 4th-order crossover (two cascaded
