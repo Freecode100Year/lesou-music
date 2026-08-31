@@ -138,9 +138,13 @@ npm run preview
 项目使用 Cloudflare Pages 部署，`functions/` 目录下的 API 代理会自动部署为 Pages Functions。
 
 ```bash
-# 手动部署
-npx wrangler pages deploy dist --project-name=lesou-music
+# 手动部署（必须带 --branch=main）
+npx wrangler pages deploy dist --project-name=lesou-music --branch=main
 ```
+
+> Cloudflare Pages 侧的生产分支名是 `main`，而本仓库的 git 分支是 `master`。
+> 不带 `--branch=main` 时 wrangler 会按当前 git 分支上传，部署落到 `master`
+> 预览环境（`master.lesou-music.pages.dev`），`mp3.freedom8964.com` 不会更新。
 
 ## License
 
