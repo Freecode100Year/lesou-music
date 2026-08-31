@@ -22,18 +22,6 @@ export function useLyrics(currentSong: Song | null, currentTime: number) {
       let lrc = '';
       if (song.sourceType === 'audius') {
         lrc = '';
-      } else if (song.sourceType === 'qq') {
-        const query = `${song.name} ${song.artist}`.trim();
-        const searchRes = await fetch(`${API.SEARCH}?keyword=${encodeURIComponent(query)}&type=wy&page=1&limit=3`);
-        const searchData = await searchRes.json();
-        if (searchData.code === 1 && searchData.data?.length > 0) {
-          const match = searchData.data[0];
-          const songRes = await fetch(`${API.SONG}?id=${match.id || match.ID}&type=wy`);
-          const songData = await songRes.json();
-          if (songData.code === 1 && songData.data) {
-            lrc = songData.data.lrc || '';
-          }
-        }
       } else if (song.sourceType === 'gd') {
         const res = await fetch(`${API.GD}?types=lyric&source=${song.source}&id=${song.id}`);
         const data = await res.json();

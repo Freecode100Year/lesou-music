@@ -69,21 +69,6 @@ export default function App() {
           if (data.code === 1 && data.data) {
             url = data.data.url || '';
           }
-        } else if (song.sourceType === 'qq') {
-          const query = `${song.name} ${song.artist}`.trim();
-          for (const plat of ['wy', 'jx']) {
-            const searchRes = await fetch(`${API.SEARCH}?keyword=${encodeURIComponent(query)}&type=${plat}&page=1&limit=5`);
-            const searchData = await searchRes.json();
-            if (searchData.code === 1 && searchData.data?.length > 0) {
-              const match = searchData.data[0];
-              const songRes = await fetch(`${API.SONG}?id=${match.id || match.ID}&type=${plat}`);
-              const songData = await songRes.json();
-              if (songData.code === 1 && songData.data?.url) {
-                url = songData.data.url;
-                break;
-              }
-            }
-          }
         } else if (song.sourceType === 'gd') {
           const res = await fetch(`${API.GD}?types=url&source=${song.source}&id=${song.id}&br=320`);
           const data = await res.json();
@@ -146,9 +131,6 @@ export default function App() {
     const cached = requestCache.get<string>(cacheKey);
     if (cached) return cached;
     if (song.pic && song.pic.startsWith('http')) return song.pic;
-    if (song.pic && (song.source === 'kw' || song.source === 'kuwo')) {
-      return `https://img2.kuwo.cn/star/albumcover/${song.pic}`;
-    }
     return '';
   };
 

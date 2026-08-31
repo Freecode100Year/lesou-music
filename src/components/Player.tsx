@@ -73,12 +73,6 @@ export function Player({
         return;
       }
 
-      if (currentSong.pic && (currentSong.source === 'kw' || currentSong.source === 'kuwo')) {
-        const url = `https://img2.kuwo.cn/star/albumcover/${currentSong.pic}`;
-        setCoverUrl(url);
-        return;
-      }
-
       if (currentSong.pic && (currentSong.source === 'wy' || currentSong.source === 'netease')) {
         try {
           const res = await fetch(`${API.GD}?types=pic&source=netease&id=${currentSong.pic}&size=300`);

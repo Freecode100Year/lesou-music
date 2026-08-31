@@ -1,14 +1,8 @@
 const ALLOWED_DOMAINS = [
   'music.126.net',
-  'kuwo.cn',
-  'qq.com',
-  'gtimg.cn',
   'joox.com',
   'audius.co',
   'injahow.cn',
-  'kugou.com',
-  'migu.cn',
-  'bilivideo.com',
 ];
 
 const CORS_HEADERS = {

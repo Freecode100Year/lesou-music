@@ -216,39 +216,6 @@ export function usePlayer(
 
 
 
-  const resolveQQSongUrl = useCallback(async (song: Song): Promise<string | null> => {
-    const query = `${song.name} ${song.artist}`.trim();
-    const platforms: Array<{ type: string; source: string }> = [
-      { type: 'wy', source: 'wy' },
-      { type: 'jx', source: 'jx' },
-    ];
-    for (const plat of platforms) {
-      try {
-        const searchUrl = `${API.SEARCH}?keyword=${encodeURIComponent(query)}&type=${plat.type}&page=1&limit=5`;
-        const searchRes = await fetch(searchUrl);
-        const searchData = await searchRes.json();
-        if (searchData.code === 1 && Array.isArray(searchData.data) && searchData.data.length > 0) {
-          const match = searchData.data[0];
-          const songId = String(match.id || match.ID);
-          const songRes = await fetch(`${API.SONG}?id=${songId}&type=${plat.source}`);
-          const songData = await songRes.json();
-          if (songData.code === 1 && songData.data && songData.data.url) {
-            if (songData.data.pic) {
-              requestCache.set(`pic_${song.sourceType}_${song.source}_${song.id}`, songData.data.pic, CACHE_TTL.PIC);
-            }
-            if (songData.data.lrc) {
-              requestCache.set(`lyric_${song.sourceType}_${song.source}_${song.id}`, songData.data.lrc, CACHE_TTL.LYRIC);
-            }
-            return songData.data.url;
-          }
-        }
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  }, []);
-
   const fetchSongUrl = useCallback(async (song: Song): Promise<string | null> => {
     const cacheKey = `song_url_${song.sourceType}_${song.source}_${song.id}`;
     const cached = requestCache.get<string>(cacheKey);
@@ -268,9 +235,6 @@ export function usePlayer(
               requestCache.set(`pic_${song.sourceType}_${song.source}_${song.id}`, data.data.pic, CACHE_TTL.PIC);
             }
           }
-        } else if (song.sourceType === 'qq') {
-          const resolved = await resolveQQSongUrl(song);
-          url = resolved || '';
         } else if (song.sourceType === 'gd') {
           const res = await fetch(`${API.GD}?types=url&source=${song.source}&id=${song.id}&br=320`);
           const data = await res.json();
@@ -303,7 +267,7 @@ export function usePlayer(
       }
     }
     return null;
-  }, [resolveQQSongUrl]);
+  }, []);
 
   const playSong = useCallback(async (song: Song, newQueue?: Song[], index?: number) => {
     setLoading(true);

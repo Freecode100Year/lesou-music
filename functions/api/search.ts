@@ -5,12 +5,11 @@ const PROXY_BASES = [
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+// Kuwo and QQ were removed: they still return search hits upstream but no
+// longer hand back a playable url, so they only ever produced silent results.
 const SOURCE_MAP: Record<string, string> = {
   wy: 'netease',
-  kw: 'kuwo',
   jx: 'joox',
-  qq: 'netease',
-  mg: 'netease',
 };
 
 export const onRequestGet: PagesFunction = async (context) => {
@@ -20,12 +19,15 @@ export const onRequestGet: PagesFunction = async (context) => {
   const page = url.searchParams.get('page') || '1';
   const limit = url.searchParams.get('limit') || '12';
 
-  const source = SOURCE_MAP[type] || 'netease';
-
   const empty = () =>
     new Response(JSON.stringify({ code: 0, data: [] }), {
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
     });
+
+  // A retired source must stay retired: never quietly fall back to another
+  // platform's catalogue for a type we no longer serve.
+  const source = SOURCE_MAP[type];
+  if (!source) return empty();
 
   for (const base of PROXY_BASES) {
     try {

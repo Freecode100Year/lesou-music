@@ -38,29 +38,6 @@ async function searchStandard(
   return [];
 }
 
-async function searchQQ(
-  kw: string,
-  pg: number,
-  signal: AbortSignal,
-): Promise<Song[]> {
-  const url = `${API.QQ_SEARCH}?w=${encodeURIComponent(kw)}&format=json&p=${pg}&n=${DEFAULT_LIMIT}`;
-  const res = await fetch(url, { signal });
-  const data = await res.json();
-  const list = data?.data?.song?.list;
-  if (Array.isArray(list)) {
-    return list.map((item: any) => ({
-      id: item.songmid || String(item.songid),
-      name: item.songname || '',
-      artist: Array.isArray(item.singer) ? item.singer.map((s: any) => s.name).join('/') : '',
-      album: item.albumname || '',
-      pic: item.albummid ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${item.albummid}.jpg` : undefined,
-      source: 'qq' as const,
-      sourceType: 'qq' as const,
-    }));
-  }
-  return [];
-}
-
 async function searchAudius(
   kw: string,
   pg: number,
@@ -92,8 +69,7 @@ async function searchAggregate(
   const searches = [
     searchStandard(kw, 'wy', pg, signal).catch(() => [] as Song[]),
     searchStandard(kw, 'jx', pg, signal).catch(() => [] as Song[]),
-    searchStandard(kw, 'kw', pg, signal).catch(() => [] as Song[]),
-    searchQQ(kw, pg, signal).catch(() => [] as Song[]),
+    searchAudius(kw, pg, signal).catch(() => [] as Song[]),
   ];
   const results = await Promise.all(searches);
   const merged: Song[] = [];
@@ -153,8 +129,6 @@ export function useSearch() {
 
         if (platformInfo.type === 'aggregate') {
           songs = await searchAggregate(kw, pg, abortRef.current.signal);
-        } else if (platformInfo.type === 'qq') {
-          songs = await searchQQ(kw, pg, abortRef.current.signal);
         } else if (platformInfo.type === 'audius') {
           songs = await searchAudius(kw, pg, abortRef.current.signal);
         } else {

@@ -11,12 +11,11 @@ export interface Song {
 
 }
 
-export type SourceType = 'standard' | 'gd' | 'qq' | 'audius';
-export type StandardPlatform = 'wy' | 'kw' | 'jx';
-export type GDSource = 'netease' | 'kuwo' | 'joox';
-export type QQSource = 'qq';
+export type SourceType = 'standard' | 'gd' | 'audius';
+export type StandardPlatform = 'wy' | 'jx';
+export type GDSource = 'netease' | 'joox';
 export type AudiusSource = 'au';
-export type SongSource = StandardPlatform | GDSource | QQSource | AudiusSource;
+export type SongSource = StandardPlatform | GDSource | AudiusSource;
 
 export interface SongDetail {
   url: string;

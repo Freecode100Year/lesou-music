@@ -7,16 +7,13 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 
 const SOURCE_MAP: Record<string, string> = {
   wy: 'netease',
-  kw: 'kuwo',
   jx: 'joox',
-  qq: 'netease',
-  mg: 'netease',
   netease: 'netease',
-  kuwo: 'kuwo',
   joox: 'joox',
 };
 
-// Sources whose `types=url` endpoint still returns playable links.
+// Every source here serves its own audio; a track missing from one is
+// re-looked-up on the other rather than silently failing.
 const PLAYABLE_SOURCES = ['netease', 'joox'];
 
 async function gdFetch(params: Record<string, string>): Promise<any | null> {
@@ -44,8 +41,8 @@ function normalize(s: string): string {
   return (s || '').toLowerCase().replace(/[\s（）()【】\[\]·・'"’”,，.。!！?？-]/g, '');
 }
 
-// Cross-source rescue: the original source has no playable url (kuwo/qq are
-// dead upstream), so re-find the track on a source that still serves audio.
+// Cross-source rescue: an occasional track is missing a url on its own source,
+// so re-find it on the sibling source that still serves audio.
 async function rescueByName(
   name: string,
   artist: string,
@@ -98,7 +95,12 @@ export const onRequestGet: PagesFunction = async (context) => {
   const type = url.searchParams.get('type') || 'wy';
   const name = url.searchParams.get('name') || '';
   const artist = url.searchParams.get('artist') || '';
-  const source = SOURCE_MAP[type] || 'netease';
+  const source = SOURCE_MAP[type];
+  if (!source) {
+    return new Response(JSON.stringify({ code: 0, data: null, msg: 'Unsupported source' }), {
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
 
   try {
     const [urlData, picData, lrcData] = await Promise.all([

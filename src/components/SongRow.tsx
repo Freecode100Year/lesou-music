@@ -5,10 +5,10 @@ import { requestCache } from '../utils/cache';
 
 const SOURCE_LABELS: Record<string, string> = {
   wy: '网易云',
-  kw: '酷我',
-  qq: 'QQ',
+  jx: 'JOOX',
+  au: 'Audius',
   netease: '网易云',
-  kuwo: '酷我',
+  joox: 'JOOX',
   all: '全网',
 };
 
@@ -38,11 +38,6 @@ export const SongRow = React.memo(function SongRow({ song, index, isPlaying, isS
 
       if (song.pic.startsWith('http')) {
         setImgSrc(song.pic);
-        return;
-      }
-
-      if (song.source === 'kw' || song.source === 'kuwo') {
-        setImgSrc(`https://img2.kuwo.cn/star/albumcover/${song.pic}`);
         return;
       }
 
