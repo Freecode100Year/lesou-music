@@ -47,10 +47,15 @@ export const onRequestGet: PagesFunction = async (context) => {
     const page = parseInt(url.searchParams.get('page') || '1', 10);
     if (!keyword) return jsonResponse({ code: 1, data: [] });
 
+    // Over-fetch: the streamable filter below runs after the upstream call, so
+    // asking for exactly `limit` would return short pages (and an empty one when
+    // the single hit happens to be non-streamable), which also broke the
+    // `length >= limit` test the client uses to decide whether more pages exist.
     const offset = (page - 1) * limit;
+    const fetchCount = Math.min(limit * 2 + 5, 100);
     const result = await audiusFetch(
       `/v1/tracks/search?query=${encodeURIComponent(keyword)}` +
-        `&app_name=${APP_NAME}&limit=${limit}&offset=${offset}`,
+        `&app_name=${APP_NAME}&limit=${fetchCount}&offset=${offset}`,
     );
     const list = result?.data;
     if (!Array.isArray(list)) return jsonResponse({ code: 0, data: [], msg: 'Audius search failed' });
@@ -60,7 +65,7 @@ export const onRequestGet: PagesFunction = async (context) => {
       (t: any) => t?.is_streamable !== false && !t?.stream_conditions,
     );
 
-    const data = playable.map((t: any) => ({
+    const data = playable.slice(0, limit).map((t: any) => ({
       id: t.id,
       name: t.title || '',
       artist: t.user?.name || t.user?.handle || '',

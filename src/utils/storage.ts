@@ -112,9 +112,14 @@ export function setPlayMode(mode: string): void {
   localStorage.setItem(KEYS.PLAY_MODE, mode);
 }
 
+// Headphone mode is the default: this is a web player, so nearly everyone is
+// on headphones or earbuds, where hard-panned mixes sit uncomfortably inside
+// the head. Turning it on by default also means the limiter and the loudness
+// levelling in the same chain are always in circuit. An explicit choice, once
+// made, is still respected.
 export function getSpatialAudio(): boolean {
   const raw = localStorage.getItem(KEYS.SPATIAL_AUDIO);
-  return raw === null ? false : raw === 'true';
+  return raw === null ? true : raw === 'true';
 }
 
 export function setSpatialAudio(enabled: boolean): void {
