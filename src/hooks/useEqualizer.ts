@@ -56,12 +56,20 @@ export const EQ_PRESETS: EqPreset[] = [
     1, 2, 3, 4, 5, 5, 5, 4, 3, 2,
     1, 0, -1, -1, -2, -2, -3, -3, -3, -3, -3,
   ]},
+  { name: 'harman', label: '哈曼曲线', gains: [
+    6.5, 6.3, 6.0, 5.6, 5.2, 4.7, 4.1, 3.5, 2.8, 2.0,
+    1.3, 0.7, 0.2, 0, 0, 0, 0, 0, 0.3, 0.8,
+    1.5, 2.2, 2.6, 2.0, 0.5, -1.0, -1.5, -1.8, -2.0, -2.5, -3.0,
+  ]},
   { name: 'electronic', label: '电子', gains: [
     6, 6, 5, 4, 3, 2, 1, 0, -1, -1,
     0, 0, 1, 1, 0, 0, -1, -1, 0, 1,
     2, 3, 4, 5, 5, 6, 6, 6, 5, 5, 4,
   ]},
 ];
+
+// 1/3-octave band Q: BW = 1/3 octave -> Q = sqrt(2^(1/3)) / (2^(1/3) - 1) ~= 4.32
+export const EQ_Q = 4.32;
 
 const DEFAULT_GAINS = Array(31).fill(0);
 
@@ -79,7 +87,10 @@ export function useEqualizer() {
       const filter = ctx.createBiquadFilter();
       filter.type = 'peaking';
       filter.frequency.value = freq;
-      filter.Q.value = 1.414;
+      // 1/3-octave spacing needs Q ~4.3. At the old Q of 1.414 each filter was
+      // nearly an octave wide, so neighbouring bands piled up and a +6 dB slider
+      // actually delivered about +24 dB.
+      filter.Q.value = EQ_Q;
       filter.gain.value = isEnabled ? currentGains[i] : 0;
       return filter;
     });

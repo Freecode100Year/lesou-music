@@ -238,7 +238,7 @@ export function Player({
           <button
             className={`player-btn spatial-btn ${spatialAudio ? 'active' : ''}`}
             onClick={onToggleSpatial}
-            title={spatialAudio ? '杜比全景声: 开' : '杜比全景声: 关'}
+            title={spatialAudio ? '耳机交叉馈送: 开' : '耳机交叉馈送: 关'}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
               <path d="M12 3v18c-5-2-8-6-8-9s3-7 8-9z" opacity={spatialAudio ? 1 : 0.4} />
