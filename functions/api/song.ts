@@ -1,46 +1,128 @@
-const PROXY_BASE = 'https://smusic0.pages.dev/api/proxy';
+const PROXY_BASES = [
+  'https://music-api.gdstudio.xyz/api.php',
+  'https://smusic0.pages.dev/api/proxy',
+];
+
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 const SOURCE_MAP: Record<string, string> = {
   wy: 'netease',
-  qq: 'netease',
   kw: 'kuwo',
+  jx: 'joox',
+  qq: 'netease',
   mg: 'netease',
+  netease: 'netease',
+  kuwo: 'kuwo',
+  joox: 'joox',
 };
+
+// Sources whose `types=url` endpoint still returns playable links.
+const PLAYABLE_SOURCES = ['netease', 'joox'];
+
+async function gdFetch(params: Record<string, string>): Promise<any | null> {
+  for (const base of PROXY_BASES) {
+    try {
+      const u = new URL(base);
+      for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+      u.searchParams.set('proxy_server', 'gdstudio');
+      const res = await fetch(u.toString(), { headers: { 'User-Agent': UA } });
+      if (!res.ok) continue;
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        continue;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+function normalize(s: string): string {
+  return (s || '').toLowerCase().replace(/[\s（）()【】\[\]·・'"’”,，.。!！?？-]/g, '');
+}
+
+// Cross-source rescue: the original source has no playable url (kuwo/qq are
+// dead upstream), so re-find the track on a source that still serves audio.
+async function rescueByName(
+  name: string,
+  artist: string,
+  exclude: string,
+): Promise<{ url: string; pic: string; lrc: string } | null> {
+  const target = normalize(name);
+  if (!target) return null;
+
+  for (const src of PLAYABLE_SOURCES) {
+    if (src === exclude) continue;
+    const list = await gdFetch({
+      types: 'search',
+      source: src,
+      name: `${name} ${artist}`.trim(),
+      count: '10',
+      pages: '1',
+    });
+    if (!Array.isArray(list)) continue;
+
+    const candidates = list.filter((it: any) => {
+      const n = normalize(it.name || '');
+      return n === target || n.includes(target) || target.includes(n);
+    });
+    const ordered = candidates.length ? candidates : list.slice(0, 3);
+
+    for (const item of ordered.slice(0, 4)) {
+      const id = String(item.url_id || item.id || '');
+      if (!id) continue;
+      const urlData = await gdFetch({ types: 'url', source: src, id, br: '320' });
+      const found = urlData?.url;
+      if (!found) continue;
+
+      const [picData, lrcData] = await Promise.all([
+        gdFetch({ types: 'pic', source: src, id: String(item.pic_id || id), size: '300' }),
+        gdFetch({ types: 'lyric', source: src, id: String(item.lyric_id || id) }),
+      ]);
+      return {
+        url: found,
+        pic: picData?.url || '',
+        lrc: lrcData?.lyric || '',
+      };
+    }
+  }
+  return null;
+}
 
 export const onRequestGet: PagesFunction = async (context) => {
   const url = new URL(context.request.url);
   const id = url.searchParams.get('id') || '';
   const type = url.searchParams.get('type') || 'wy';
+  const name = url.searchParams.get('name') || '';
+  const artist = url.searchParams.get('artist') || '';
   const source = SOURCE_MAP[type] || 'netease';
 
   try {
-    const [urlRes, picRes, lrcRes] = await Promise.allSettled([
-      fetch(`${PROXY_BASE}?types=url&source=${source}&proxy_server=gdstudio&id=${id}&br=320`, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      }),
-      fetch(`${PROXY_BASE}?types=pic&source=${source}&proxy_server=gdstudio&id=${id}&size=300`, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      }),
-      fetch(`${PROXY_BASE}?types=lyric&source=${source}&proxy_server=gdstudio&id=${id}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      }),
+    const [urlData, picData, lrcData] = await Promise.all([
+      gdFetch({ types: 'url', source, id, br: '320' }),
+      gdFetch({ types: 'pic', source, id, size: '300' }),
+      gdFetch({ types: 'lyric', source, id }),
     ]);
 
-    let songUrl = '';
-    let pic = '';
-    let lrc = '';
+    let songUrl = urlData?.url || '';
+    let pic = picData?.url || '';
+    let lrc = lrcData?.lyric || '';
 
-    if (urlRes.status === 'fulfilled' && urlRes.value.ok) {
-      const data = await urlRes.value.json() as any;
-      songUrl = data.url || '';
+    if (!songUrl && name) {
+      const rescued = await rescueByName(name, artist, source);
+      if (rescued) {
+        songUrl = rescued.url;
+        if (!pic) pic = rescued.pic;
+        if (!lrc) lrc = rescued.lrc;
+      }
     }
-    if (picRes.status === 'fulfilled' && picRes.value.ok) {
-      const data = await picRes.value.json() as any;
-      pic = data.url || '';
-    }
-    if (lrcRes.status === 'fulfilled' && lrcRes.value.ok) {
-      const data = await lrcRes.value.json() as any;
-      lrc = data.lyric || '';
+
+    // Last resort for netease ids: Meting mirror that 302s to the CDN file.
+    if (!songUrl && source === 'netease' && /^\d+$/.test(id)) {
+      songUrl = `https://api.injahow.cn/meting/?type=url&id=${id}`;
     }
 
     return new Response(

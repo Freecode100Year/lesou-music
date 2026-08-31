@@ -1,8 +1,8 @@
 const INVIDIOUS_INSTANCES = [
-  'https://yt.chocolatemoo53.com',
   'https://invidious.materialio.us',
-  'https://inv.nadeko.net',
-  'https://invidious.nerdvpn.de',
+  'https://yewtu.be',
+  'https://invidious.privacyredirect.com',
+  'https://invidious.f5.si',
 ];
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';

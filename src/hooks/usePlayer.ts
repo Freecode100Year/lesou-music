@@ -220,7 +220,7 @@ export function usePlayer(
     const query = `${song.name} ${song.artist}`.trim();
     const platforms: Array<{ type: string; source: string }> = [
       { type: 'wy', source: 'wy' },
-      { type: 'kw', source: 'kw' },
+      { type: 'jx', source: 'jx' },
     ];
     for (const plat of platforms) {
       try {
@@ -259,27 +259,27 @@ export function usePlayer(
       try {
         let url: string = '';
 
-        if (song.sourceType === 'qq') {
-          const resolved = await resolveQQSongUrl(song);
-          url = resolved || '';
-        } else if (song.sourceType === 'pjmp3') {
-          const res = await fetch(`${API.PJMP3}?action=song&id=${song.id}`);
+        if (song.sourceType === 'audius') {
+          const res = await fetch(`${API.AUDIUS}?action=song&id=${encodeURIComponent(song.id)}`);
           const data = await res.json();
           if (data.code === 1 && data.data) {
             url = data.data.url;
             if (data.data.pic) {
               requestCache.set(`pic_${song.sourceType}_${song.source}_${song.id}`, data.data.pic, CACHE_TTL.PIC);
             }
-            if (data.data.lrc) {
-              requestCache.set(`lyric_${song.sourceType}_${song.source}_${song.id}`, data.data.lrc, CACHE_TTL.LYRIC);
-            }
           }
+        } else if (song.sourceType === 'qq') {
+          const resolved = await resolveQQSongUrl(song);
+          url = resolved || '';
         } else if (song.sourceType === 'gd') {
           const res = await fetch(`${API.GD}?types=url&source=${song.source}&id=${song.id}&br=320`);
           const data = await res.json();
           url = data.url || '';
         } else {
-          const res = await fetch(`${API.SONG}?id=${song.id}&type=${song.source}`);
+          const res = await fetch(
+            `${API.SONG}?id=${song.id}&type=${song.source}` +
+              `&name=${encodeURIComponent(song.name)}&artist=${encodeURIComponent(song.artist)}`,
+          );
           const data = await res.json();
           if (data.code === 1 && data.data) {
             url = data.data.url;

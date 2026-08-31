@@ -2,13 +2,16 @@
 
 多源聚合在线音乐播放器，支持网易云音乐、酷我音乐、QQ音乐等平台的歌曲搜索与播放。
 
-## 📢 最新更新与 Bug 修复 (2026-07-01)
+## 📢 最新更新 (2026-08-30)
 
-### 🐛 修正的 Bug
-- **修复切歌冲突与重复事件监听器 Bug**：移除了 `usePlayer` 中在组件挂载时错误绑定的 stale closure 音频 `ended` 事件监听器，解决了在用户切换“顺序播放 / 单曲循环”等播放模式时，新旧事件监听器同时触发导致的跳歌、重播或切歌冲突问题。
-
-### ⚡ 性能优化
-- **规避编译期暂时性死区 (TDZ)**：重构了 `usePlayer` 事件绑定逻辑，将依赖 `playNext` 的 `useEffect` 移动至其声明下方，解决了 TypeScript 编译时 `playNext` 提前引用报错（TS2448 / TS2454）的问题，提升了构建的类型安全性。
+### 🎵 音源更新迭代
+- **新增 JOOX 音源**：搜索 / 播放 / 歌词 / 封面全链路可用，作为酷我失效后的主力替代源。
+- **新增 Audius 音源**：接入去中心化音乐平台 Audius 公开 API（无需 key、全球可访问），以欧美 lofi / 电子 / 嘻哈 / 独立音乐为主，与华语源互补。已过滤 `is_streamable: false` 与门控曲目，避免点播 404。
+- **修复酷我播放失效**：上游 `types=url&source=kuwo` 已废，改为服务端跨源兜底——按歌名 + 歌手重新到 netease / joox 匹配取真实播放地址。
+- **修复 QQ 播放错配**：原先把 QQ 的 songmid 拿去请求网易云必然失败，跨源兜底链改为 `wy → jx`。
+- **移除 pjmp3 音源**：源站 HTTPS 已不可用，相关代理与前端引用一并下架。
+- **上游双通道容错**：三个代理均改为 `music-api.gdstudio.xyz` 直连优先、`smusic0.pages.dev` 兜底；网易云再加 Meting 镜像作末级兜底。
+- **更新 Invidious 实例列表**（YouTube 搜索端点，当前仍受 Cloudflare 边缘出口限制）。
 
 ---
 
@@ -20,7 +23,7 @@
 ## 功能特性
 
 ### 音乐播放
-- 多平台聚合搜索（网易云 / 酷我 / QQ音乐 / 全网聚合）
+- 多平台聚合搜索（网易云 / 酷我 / JOOX / QQ音乐 / Audius / 全网聚合）
 - 歌词同步显示（支持 LRC 逐行高亮）
 - 播放模式切换（顺序播放 / 随机播放 / 单曲循环）
 - 播放队列管理（添加、移除、清空）
@@ -89,7 +92,8 @@ functions/api/        # Cloudflare Pages Functions（服务端代理）
 ├── search.ts             # 搜索代理
 ├── song.ts               # 歌曲详情/URL/歌词代理
 ├── gd.ts                 # 聚合源代理
-├── pjmp3.ts              # pjmp3 源代理
+├── audius.ts             # Audius 源代理（搜索 / 详情）
+├── youtube-search.ts     # YouTube (Invidious) 搜索代理
 └── audio-proxy.ts        # 音频流 CORS 代理
 ```
 

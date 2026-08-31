@@ -3,8 +3,11 @@ const ALLOWED_DOMAINS = [
   'kuwo.cn',
   'qq.com',
   'gtimg.cn',
-  'pjmp3.com',
+  'joox.com',
+  'audius.co',
+  'injahow.cn',
   'kugou.com',
+  'migu.cn',
   'bilivideo.com',
 ];
 
@@ -51,7 +54,7 @@ export const onRequestGet: PagesFunction = async (context) => {
     const range = context.request.headers.get('Range');
     if (range) reqHeaders['Range'] = range;
 
-    const response = await fetch(audioUrl, { headers: reqHeaders });
+    const response = await fetch(audioUrl, { headers: reqHeaders, redirect: 'follow' });
 
     const headers = new Headers(CORS_HEADERS);
     for (const key of ['Content-Type', 'Content-Length', 'Content-Range', 'Accept-Ranges']) {

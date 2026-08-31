@@ -63,9 +63,15 @@ export default function App() {
       url = cached;
     } else {
       try {
-        if (song.sourceType === 'qq') {
+        if (song.sourceType === 'audius') {
+          const res = await fetch(`${API.AUDIUS}?action=song&id=${encodeURIComponent(song.id)}`);
+          const data = await res.json();
+          if (data.code === 1 && data.data) {
+            url = data.data.url || '';
+          }
+        } else if (song.sourceType === 'qq') {
           const query = `${song.name} ${song.artist}`.trim();
-          for (const plat of ['wy', 'kw']) {
+          for (const plat of ['wy', 'jx']) {
             const searchRes = await fetch(`${API.SEARCH}?keyword=${encodeURIComponent(query)}&type=${plat}&page=1&limit=5`);
             const searchData = await searchRes.json();
             if (searchData.code === 1 && searchData.data?.length > 0) {
@@ -78,18 +84,15 @@ export default function App() {
               }
             }
           }
-        } else if (song.sourceType === 'pjmp3') {
-          const res = await fetch(`${API.PJMP3}?action=song&id=${song.id}`);
-          const data = await res.json();
-          if (data.code === 1 && data.data) {
-            url = data.data.url || '';
-          }
         } else if (song.sourceType === 'gd') {
           const res = await fetch(`${API.GD}?types=url&source=${song.source}&id=${song.id}&br=320`);
           const data = await res.json();
           url = data.url || '';
         } else {
-          const res = await fetch(`${API.SONG}?id=${song.id}&type=${song.source}`);
+          const res = await fetch(
+            `${API.SONG}?id=${song.id}&type=${song.source}` +
+              `&name=${encodeURIComponent(song.name)}&artist=${encodeURIComponent(song.artist)}`,
+          );
           const data = await res.json();
           if (data.code === 1 && data.data) {
             url = data.data.url || '';

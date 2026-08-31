@@ -20,7 +20,9 @@ export function useLyrics(currentSong: Song | null, currentTime: number) {
 
     try {
       let lrc = '';
-      if (song.sourceType === 'qq') {
+      if (song.sourceType === 'audius') {
+        lrc = '';
+      } else if (song.sourceType === 'qq') {
         const query = `${song.name} ${song.artist}`.trim();
         const searchRes = await fetch(`${API.SEARCH}?keyword=${encodeURIComponent(query)}&type=wy&page=1&limit=3`);
         const searchData = await searchRes.json();
@@ -32,18 +34,15 @@ export function useLyrics(currentSong: Song | null, currentTime: number) {
             lrc = songData.data.lrc || '';
           }
         }
-      } else if (song.sourceType === 'pjmp3') {
-        const res = await fetch(`${API.PJMP3}?action=song&id=${song.id}`);
-        const data = await res.json();
-        if (data.code === 1 && data.data) {
-          lrc = data.data.lrc || '';
-        }
       } else if (song.sourceType === 'gd') {
         const res = await fetch(`${API.GD}?types=lyric&source=${song.source}&id=${song.id}`);
         const data = await res.json();
         lrc = data.lyric || '';
       } else {
-        const res = await fetch(`${API.SONG}?id=${song.id}&type=${song.source}`);
+        const res = await fetch(
+          `${API.SONG}?id=${song.id}&type=${song.source}` +
+            `&name=${encodeURIComponent(song.name)}&artist=${encodeURIComponent(song.artist)}`,
+        );
         const data = await res.json();
         if (data.code === 1 && data.data) {
           lrc = data.data.lrc || '';

@@ -2,8 +2,8 @@ export const API = {
   SEARCH: '/api/search',
   SONG: '/api/song',
   GD: '/api/gd',
-  PJMP3: '/api/pjmp3',
   QQ_SEARCH: '/qqapi/soso/fcgi-bin/client_search_cp',
+  AUDIUS: '/api/audius',
   AUDIO_PROXY: '/api/audio-proxy',
 } as const;
 
@@ -11,7 +11,9 @@ export const PLATFORMS = [
   { key: 'all', label: '全网', type: 'aggregate' as const },
   { key: 'wy', label: '网易云', type: 'standard' as const },
   { key: 'kw', label: '酷我', type: 'standard' as const },
+  { key: 'jx', label: 'JOOX', type: 'standard' as const },
   { key: 'qq', label: 'QQ音乐', type: 'qq' as const },
+  { key: 'au', label: 'Audius', type: 'audius' as const },
 ] as const;
 
 export const CACHE_TTL = {
