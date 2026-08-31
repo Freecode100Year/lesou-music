@@ -16,55 +16,108 @@ export const EQ_LABELS = [
 export interface EqPreset {
   name: string;
   label: string;
+  /** One line on the house sound; shown as the preset button tooltip. */
+  hint: string;
   gains: number[];
 }
 
+// House-curve presets.
+//
+// These are voicing curves, not measurements. Each one shapes a neutral in-ear
+// towards the way that brand's own earphones sound in their default mode - no
+// companion app, no EQ - following the published deviation of their stock tuning
+// from the Harman in-ear target. They approximate a house sound, not any one
+// model: a brand's line-up varies, and so does every ear canal.
+//
+// The slider values are smaller than the acoustic result on purpose. 31 bands at
+// 1/3-octave spacing overlap, so a run of equal sliders sums to roughly 1.5x what
+// each slider says; the numbers below are written so the summed response lands
+// where the house curve actually sits.
 export const EQ_PRESETS: EqPreset[] = [
-  { name: 'flat', label: '平坦', gains: Array(31).fill(0) },
-  { name: 'rock', label: '摇滚', gains: [
-    4, 4, 3, 3, 2, 1, 0, -1, -2, -2,
-    -1, 0, 1, 2, 3, 3, 4, 4, 3, 3,
-    3, 3, 4, 4, 5, 5, 5, 5, 4, 4, 3,
+  { name: 'flat', label: '平坦', hint: '不做任何补偿，直出音源本身', gains: Array(31).fill(0) },
+
+  { name: 'harman_ie', label: '哈曼 IE', hint: '哈曼入耳目标曲线：盲测偏好度最高的中性基准', gains: [
+    3.5, 3.4, 3.2, 3.0, 2.7, 2.4, 2.0, 1.6, 1.2, 0.8,
+    0.4, 0.1, 0, 0, 0, 0, 0.2, 0.4, 0.8, 1.2,
+    1.6, 1.8, 1.4, 0.4, -0.8, -1.2, -1.0, -0.4, 0.2, 0.6, 0.8,
   ]},
-  { name: 'pop', label: '流行', gains: [
-    -1, -1, 0, 1, 2, 3, 3, 2, 1, 0,
-    0, 0, 1, 2, 3, 3, 3, 2, 1, 1,
-    0, 0, -1, -1, -1, -1, -1, 0, 0, 0, 0,
+
+  { name: 'sony', label: '索尼', hint: 'WF-1000XM 系默认：厚重超低频，8k 以上带亮泽', gains: [
+    5.5, 5.4, 5.2, 4.8, 4.4, 4.0, 3.4, 2.6, 1.8, 1.0,
+    0.4, 0, -0.4, -0.6, -0.6, -0.4, 0, 0.2, 0.4, 0.6,
+    0.6, 0.4, -0.4, -1.0, -0.6, 0.4, 1.6, 2.2, 2.0, 1.4, 1.0,
   ]},
-  { name: 'jazz', label: '爵士', gains: [
-    3, 3, 2, 2, 1, 1, 0, 0, 1, 2,
-    2, 3, 3, 3, 2, 1, 0, 0, 0, 1,
-    1, 2, 2, 3, 3, 4, 4, 4, 3, 3, 2,
+
+  { name: 'bose', label: 'Bose', hint: '消噪耳塞默认：温暖饱满，高频收得最干净', gains: [
+    4.5, 4.4, 4.2, 4.0, 3.6, 3.2, 2.6, 2.0, 1.4, 0.8,
+    0.4, 0.2, 0.2, 0.2, 0.2, 0.2, 0.4, 0.6, 0.8, 1.0,
+    1.2, 1.2, 0.8, 0, -1.2, -2.0, -2.4, -2.0, -1.4, -1.0, -0.8,
   ]},
-  { name: 'classical', label: '古典', gains: [
-    3, 3, 3, 2, 2, 1, 1, 0, 0, 0,
-    0, 0, 0, 0, 0, -1, -1, -1, 0, 0,
-    0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4,
+
+  { name: 'airpods', label: 'AirPods', hint: 'AirPods Pro 默认：贴近哈曼，人声清晰不刺', gains: [
+    3.0, 3.0, 2.8, 2.6, 2.4, 2.2, 1.8, 1.4, 1.0, 0.6,
+    0.2, 0, 0, 0, 0, 0.2, 0.4, 0.6, 1.0, 1.4,
+    1.8, 2.0, 1.6, 0.6, -0.6, -1.4, -1.2, -0.6, -0.2, -0.8, -1.4,
   ]},
-  { name: 'bass', label: '低音增强', gains: [
-    8, 7, 6, 6, 5, 5, 4, 3, 2, 1,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+  { name: 'sennheiser', label: '森海塞尔', hint: '中性偏暖的监听底子，齿音收敛、空气感保留', gains: [
+    2.5, 2.4, 2.2, 2.0, 1.8, 1.6, 1.4, 1.2, 0.8, 0.4,
+    0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.4, 0.6, 0.8, 1.0,
+    1.0, 1.0, 0.6, 0, -0.8, -1.2, -0.8, 0, 0.6, 1.0, 1.2,
   ]},
-  { name: 'treble', label: '高音增强', gains: [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
-    2, 2, 3, 3, 4, 5, 5, 6, 6, 7, 8,
+
+  { name: 'beats', label: 'Beats', hint: '低频最猛，中低频下凹，人声推前', gains: [
+    7.0, 6.8, 6.5, 6.0, 5.5, 5.0, 4.2, 3.2, 2.2, 1.2,
+    0.2, -0.6, -1.2, -1.6, -1.6, -1.2, -0.6, 0, 0.8, 1.6,
+    2.2, 2.6, 2.2, 1.2, -0.4, -1.2, -1.0, -0.2, 0.6, 1.0, 0.8,
   ]},
-  { name: 'vocal', label: '人声', gains: [
-    -3, -3, -3, -2, -2, -1, -1, 0, 0, 1,
-    1, 2, 3, 4, 5, 5, 5, 4, 3, 2,
-    1, 0, -1, -1, -2, -2, -3, -3, -3, -3, -3,
+
+  { name: 'akg', label: '三星 AKG', hint: 'Galaxy Buds 默认：均衡底子加上中频解析', gains: [
+    2.8, 2.7, 2.6, 2.4, 2.2, 2.0, 1.6, 1.2, 0.8, 0.4,
+    0.2, 0, 0, 0, 0, 0.2, 0.4, 0.8, 1.2, 1.8,
+    2.2, 2.4, 2.0, 1.2, 0.4, -0.4, -0.6, 0, 0.6, 1.0, 1.0,
   ]},
-  { name: 'harman', label: '哈曼曲线', gains: [
-    6.5, 6.3, 6.0, 5.6, 5.2, 4.7, 4.1, 3.5, 2.8, 2.0,
-    1.3, 0.7, 0.2, 0, 0, 0, 0, 0, 0.3, 0.8,
-    1.5, 2.2, 2.6, 2.0, 0.5, -1.0, -1.5, -1.8, -2.0, -2.5, -3.0,
+
+  { name: 'jbl', label: 'JBL', hint: '典型 V 型：低频弹、高频闪，听流行最讨好', gains: [
+    6.0, 5.9, 5.6, 5.2, 4.8, 4.4, 3.6, 2.8, 1.8, 1.0,
+    0.4, 0, -0.4, -0.6, -0.6, -0.2, 0.2, 0.6, 1.0, 1.6,
+    2.0, 2.2, 1.8, 0.8, -0.4, -0.2, 1.0, 2.0, 2.2, 1.6, 1.0,
   ]},
-  { name: 'electronic', label: '电子', gains: [
-    6, 6, 5, 4, 3, 2, 1, 0, -1, -1,
-    0, 0, 1, 1, 0, 0, -1, -1, 0, 1,
-    2, 3, 4, 5, 5, 6, 6, 6, 5, 5, 4,
+
+  { name: 'xiaomi', label: '小米', hint: '中低频量感突出，5–8k 提亮，通勤向听感', gains: [
+    4.0, 4.2, 4.4, 4.6, 4.6, 4.4, 4.0, 3.2, 2.2, 1.2,
+    0.4, 0, -0.4, -0.8, -1.0, -1.0, -0.8, -0.6, -0.2, 0.4,
+    1.0, 1.4, 1.4, 1.0, 1.2, 1.8, 2.0, 1.6, 1.0, 0.6, 0.4,
+  ]},
+
+  { name: 'huawei', label: '华为', hint: 'FreeBuds 默认：温润耐听，齿音压得住', gains: [
+    4.0, 3.9, 3.7, 3.4, 3.1, 2.8, 2.3, 1.8, 1.2, 0.6,
+    0.2, 0, 0, 0, 0, 0.2, 0.4, 0.6, 0.8, 1.2,
+    1.4, 1.6, 1.2, 0.4, -0.6, -1.2, -1.0, -0.2, 0.6, 1.0, 1.0,
+  ]},
+
+  { name: 'shure', label: '舒尔', hint: 'SE 系监听：中频前置、高频最暗，久听不累', gains: [
+    2.0, 2.0, 1.9, 1.8, 1.7, 1.6, 1.5, 1.4, 1.2, 1.0,
+    0.8, 0.8, 0.8, 1.0, 1.2, 1.2, 1.2, 1.0, 0.8, 0.6,
+    0.4, 0, -0.6, -1.4, -2.4, -3.0, -3.4, -3.0, -2.6, -2.4, -2.4,
+  ]},
+
+  { name: 'audiotechnica', label: '铁三角', hint: '偏亮偏解析，上中频与高频前置，女声见长', gains: [
+    3.0, 2.9, 2.8, 2.6, 2.4, 2.2, 1.8, 1.4, 0.8, 0.2,
+    -0.2, -0.4, -0.4, -0.2, 0, 0.2, 0.6, 1.0, 1.4, 2.0,
+    2.4, 2.6, 2.4, 1.6, 1.0, 1.4, 2.0, 2.2, 2.0, 1.6, 1.2,
+  ]},
+
+  { name: 'beyerdynamic', label: '拜亚动力', hint: '低频精瘦、8–10k 明显抬升的经典亮声', gains: [
+    2.0, 2.0, 1.9, 1.8, 1.6, 1.4, 1.2, 0.8, 0.4, 0,
+    -0.2, -0.4, -0.4, -0.4, -0.2, 0, 0.2, 0.6, 1.0, 1.4,
+    1.8, 2.0, 1.8, 1.2, 1.0, 1.8, 3.0, 3.4, 3.0, 2.2, 1.6,
+  ]},
+
+  { name: 'bo', label: 'B&O', hint: '低频克制、中频顺滑，高频留一点空气感', gains: [
+    3.4, 3.3, 3.1, 2.9, 2.6, 2.3, 1.9, 1.5, 1.0, 0.6,
+    0.2, 0, 0, 0, 0, 0.2, 0.4, 0.6, 0.8, 1.0,
+    1.2, 1.4, 1.2, 0.6, -0.4, -0.8, -0.4, 0.4, 1.2, 1.6, 1.6,
   ]},
 ];
 
@@ -73,11 +126,43 @@ export const EQ_Q = 4.32;
 
 const DEFAULT_GAINS = Array(31).fill(0);
 
+// Estimate the summed response of the whole cascade at each band centre.
+// Neighbouring 1/3-octave bells overlap, so a run of +4 dB sliders really
+// delivers about +6 dB; the weights are the bell's response one and two bands
+// away at Q = 4.32.
+const SKIRT_1 = 0.22;
+const SKIRT_2 = 0.06;
+
+export function estimatePeakBoostDb(gains: number[]): number {
+  let peak = 0;
+  for (let i = 0; i < gains.length; i++) {
+    const sum =
+      gains[i] +
+      SKIRT_1 * ((gains[i - 1] ?? 0) + (gains[i + 1] ?? 0)) +
+      SKIRT_2 * ((gains[i - 2] ?? 0) + (gains[i + 2] ?? 0));
+    if (sum > peak) peak = sum;
+  }
+  return peak;
+}
+
 export function useEqualizer() {
   const [gains, setGains] = useState<number[]>(() => getEqGains() || DEFAULT_GAINS);
   const [enabled, setEnabledState] = useState(() => getEqEnabled());
   const [preset, setPresetState] = useState(() => getEqPreset());
   const filtersRef = useRef<BiquadFilterNode[]>([]);
+  const preampRef = useRef<GainNode | null>(null);
+
+  // Every house curve boosts something, and the loudest of them adds more than
+  // 10 dB. Without a matching preamp cut that lands straight in the limiter and
+  // the track pumps for the whole song - which is exactly what an in-ear reveals
+  // worst.
+  const applyPreamp = useCallback((activeGains: number[], isEnabled: boolean) => {
+    const node = preampRef.current;
+    if (!node) return;
+    const boost = isEnabled ? estimatePeakBoostDb(activeGains) : 0;
+    const target = Math.pow(10, -Math.max(0, boost) / 20);
+    node.gain.setTargetAtTime(target, node.context.currentTime, 0.03);
+  }, []);
 
   const createFilters = useCallback((ctx: AudioContext): BiquadFilterNode[] => {
     if (filtersRef.current.length > 0) return filtersRef.current;
@@ -101,12 +186,24 @@ export function useEqualizer() {
     return filters;
   }, []);
 
+  const createPreamp = useCallback((ctx: AudioContext): GainNode => {
+    if (!preampRef.current) {
+      const node = ctx.createGain();
+      const isEnabled = getEqEnabled();
+      const boost = isEnabled ? estimatePeakBoostDb(getEqGains() || DEFAULT_GAINS) : 0;
+      node.gain.value = Math.pow(10, -Math.max(0, boost) / 20);
+      preampRef.current = node;
+    }
+    return preampRef.current;
+  }, []);
+
   const setBandGain = useCallback((index: number, gain: number) => {
     const clamped = Math.max(-20, Math.min(20, gain));
     setGains(prev => {
       const next = [...prev];
       next[index] = clamped;
       saveEqGains(next);
+      if (enabled) applyPreamp(next, true);
       return next;
     });
     if (filtersRef.current[index] && enabled) {
@@ -114,7 +211,7 @@ export function useEqualizer() {
     }
     setPresetState('custom');
     saveEqPreset('custom');
-  }, [enabled]);
+  }, [enabled, applyPreamp]);
 
   const reset = useCallback(() => {
     setGains(DEFAULT_GAINS);
@@ -122,16 +219,19 @@ export function useEqualizer() {
     setPresetState('flat');
     saveEqPreset('flat');
     filtersRef.current.forEach(f => { f.gain.value = 0; });
-  }, []);
+    applyPreamp(DEFAULT_GAINS, enabled);
+  }, [applyPreamp, enabled]);
 
   const setEnabled = useCallback((on: boolean) => {
     setEnabledState(on);
     saveEqEnabled(on);
-    const currentGains = on ? (getEqGains() || DEFAULT_GAINS) : DEFAULT_GAINS;
+    const stored = getEqGains() || DEFAULT_GAINS;
+    const active = on ? stored : DEFAULT_GAINS;
     filtersRef.current.forEach((f, i) => {
-      f.gain.value = currentGains[i];
+      f.gain.value = active[i];
     });
-  }, []);
+    applyPreamp(stored, on);
+  }, [applyPreamp]);
 
   const applyPreset = useCallback((presetName: string) => {
     const p = EQ_PRESETS.find(pr => pr.name === presetName);
@@ -145,10 +245,11 @@ export function useEqualizer() {
         f.gain.value = p.gains[i];
       });
     }
-  }, [enabled]);
+    applyPreamp(p.gains, enabled);
+  }, [enabled, applyPreamp]);
 
   return {
-    gains, enabled, preset, filtersRef,
-    createFilters, setBandGain, reset, setEnabled, applyPreset,
+    gains, enabled, preset, filtersRef, preampRef,
+    createFilters, createPreamp, setBandGain, reset, setEnabled, applyPreset,
   };
 }

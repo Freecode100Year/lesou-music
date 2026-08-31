@@ -9,6 +9,10 @@ const KEYS = {
   VOLUME: 'xql_volume',
   PLAY_MODE: 'xql_play_mode',
   SPATIAL_AUDIO: 'xql_spatial_audio',
+  CROSSFEED: 'xql_crossfeed',
+  DEESSER: 'xql_deesser',
+  LOUDNESS_COMP: 'xql_loudness_comp',
+  OUTPUT_MODE: 'xql_output_mode',
   GAIN_MULTIPLIER: 'xql_gain_multiplier',
   EQ_ENABLED: 'xql_eq_enabled',
   EQ_GAINS: 'xql_eq_gains',
@@ -112,18 +116,66 @@ export function setPlayMode(mode: string): void {
   localStorage.setItem(KEYS.PLAY_MODE, mode);
 }
 
-// Headphone mode is the default: this is a web player, so nearly everyone is
-// on headphones or earbuds, where hard-panned mixes sit uncomfortably inside
-// the head. Turning it on by default also means the limiter and the loudness
-// levelling in the same chain are always in circuit. An explicit choice, once
-// made, is still respected.
-export function getSpatialAudio(): boolean {
-  const raw = localStorage.getItem(KEYS.SPATIAL_AUDIO);
+// Crossfeed strength. In-ear monitors are the worst case for headphone
+// listening: sealed in the canal, they leak nothing across to the other ear, so
+// hard-panned material collapses into two points inside the head. Medium is the
+// default because it is the amount that relieves that without audibly narrowing
+// the image. An explicit choice, once made, is still respected.
+export type CrossfeedMode = 'off' | 'light' | 'medium' | 'strong';
+
+const CROSSFEED_MODES: CrossfeedMode[] = ['off', 'light', 'medium', 'strong'];
+
+export function getCrossfeedMode(): CrossfeedMode {
+  const raw = localStorage.getItem(KEYS.CROSSFEED);
+  if (raw && (CROSSFEED_MODES as string[]).includes(raw)) return raw as CrossfeedMode;
+  // Migrate the old on/off flag.
+  const legacy = localStorage.getItem(KEYS.SPATIAL_AUDIO);
+  return legacy === 'false' ? 'off' : 'medium';
+}
+
+export function setCrossfeedMode(mode: CrossfeedMode): void {
+  localStorage.setItem(KEYS.CROSSFEED, mode);
+  localStorage.setItem(KEYS.SPATIAL_AUDIO, String(mode !== 'off'));
+}
+
+// De-esser on by default: the canal resonance of an in-ear sits around 6-8 kHz,
+// right where 320 kbps lossy encodes are already grainiest, so sibilance that is
+// merely bright on speakers turns into a needle in the ear.
+export function getDeEsser(): boolean {
+  const raw = localStorage.getItem(KEYS.DEESSER);
   return raw === null ? true : raw === 'true';
 }
 
-export function setSpatialAudio(enabled: boolean): void {
-  localStorage.setItem(KEYS.SPATIAL_AUDIO, String(enabled));
+export function setDeEsser(enabled: boolean): void {
+  localStorage.setItem(KEYS.DEESSER, String(enabled));
+}
+
+// Equal-loudness compensation, also on by default. In-ears isolate, so people
+// play them quieter than speakers, and at low SPL the ear loses bass extension
+// faster than anything else (ISO 226). Tracking the volume control with a gentle
+// shelf keeps the balance the mix engineer intended.
+export function getLoudnessComp(): boolean {
+  const raw = localStorage.getItem(KEYS.LOUDNESS_COMP);
+  return raw === null ? true : raw === 'true';
+}
+
+export function setLoudnessComp(enabled: boolean): void {
+  localStorage.setItem(KEYS.LOUDNESS_COMP, String(enabled));
+}
+
+// Which transducer the chain is being voiced for. Headphone is the default -
+// this is a web player, so most listening happens on in-ears - but a laptop or
+// a desk speaker needs the opposite treatment: no crossfeed (the room already
+// does that), no de-esser aimed at a canal resonance that is not there, and a
+// cabinet voicing instead.
+export type OutputMode = 'headphone' | 'speaker';
+
+export function getOutputMode(): OutputMode {
+  return localStorage.getItem(KEYS.OUTPUT_MODE) === 'speaker' ? 'speaker' : 'headphone';
+}
+
+export function setOutputMode(mode: OutputMode): void {
+  localStorage.setItem(KEYS.OUTPUT_MODE, mode);
 }
 
 export function getGainMultiplier(): number {

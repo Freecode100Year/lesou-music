@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Song, PlayMode } from '../types';
+import { CrossfeedMode, OutputMode } from '../utils/storage';
+import { CROSSFEED_LABELS } from '../hooks/usePlayer';
 import { formatTime } from '../utils/format';
 import { API, CACHE_TTL } from '../config';
 import { requestCache } from '../utils/cache';
@@ -11,13 +13,15 @@ interface PlayerProps {
   duration: number;
   volume: number;
   playMode: PlayMode;
-  spatialAudio: boolean;
+  crossfeedMode: CrossfeedMode;
+  outputMode: OutputMode;
   loading: boolean;
   onTogglePlay: () => void;
   onSeek: (time: number) => void;
   onSetVolume: (vol: number) => void;
   onSetPlayMode: (mode: PlayMode) => void;
-  onToggleSpatial: () => void;
+  onCycleCrossfeed: () => void;
+  onToggleOutput: () => void;
   onNext: () => void;
   onPrev: () => void;
   onShowLyrics: () => void;
@@ -33,13 +37,15 @@ export function Player({
   duration,
   volume,
   playMode,
-  spatialAudio,
+  crossfeedMode,
+  outputMode,
   loading,
   onTogglePlay,
   onSeek,
   onSetVolume,
   onSetPlayMode,
-  onToggleSpatial,
+  onCycleCrossfeed,
+  onToggleOutput,
   onNext,
   onPrev,
   onShowLyrics,
@@ -236,15 +242,33 @@ export function Player({
             </svg>
           </button>
           <button
-            className={`player-btn spatial-btn ${spatialAudio ? 'active' : ''}`}
-            onClick={onToggleSpatial}
-            title={spatialAudio ? '耳机交叉馈送: 开' : '耳机交叉馈送: 关'}
+            className={`player-btn spatial-btn ${crossfeedMode !== 'off' && outputMode === 'headphone' ? 'active' : ''}`}
+            onClick={onCycleCrossfeed}
+            disabled={outputMode === 'speaker'}
+            title={
+              outputMode === 'speaker'
+                ? '音箱外放时无需交叉馈送'
+                : `耳机交叉馈送：${CROSSFEED_LABELS[crossfeedMode]}（点击切换 关/轻/中/强）`
+            }
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-              <path d="M12 3v18c-5-2-8-6-8-9s3-7 8-9z" opacity={spatialAudio ? 1 : 0.4} />
-              <path d="M14 5.5c3 1.5 5 4.5 5 6.5s-2 5-5 6.5" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={spatialAudio ? 1 : 0.3} />
-              <path d="M16 3.5c4 2 6.5 5.5 6.5 8.5s-2.5 6.5-6.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={spatialAudio ? 1 : 0.3} />
+              <path d="M12 3v18c-5-2-8-6-8-9s3-7 8-9z" opacity={crossfeedMode !== 'off' ? 1 : 0.4} />
+              <path d="M14 5.5c3 1.5 5 4.5 5 6.5s-2 5-5 6.5" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={crossfeedMode !== 'off' ? 1 : 0.3} />
+              <path d="M16 3.5c4 2 6.5 5.5 6.5 8.5s-2.5 6.5-6.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={crossfeedMode === 'strong' ? 1 : 0.3} />
             </svg>
+            <span className="btn-badge">{CROSSFEED_LABELS[crossfeedMode]}</span>
+          </button>
+          <button
+            className={`player-btn speaker-btn ${outputMode === 'speaker' ? 'active' : ''}`}
+            onClick={onToggleOutput}
+            title={outputMode === 'speaker' ? '音箱外放：开（Marshall 音箱曲线）' : '音箱外放：关（当前为耳机模式）'}
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <rect x="5" y="2.5" width="14" height="19" rx="2" />
+              <circle cx="12" cy="15" r="3.4" fill={outputMode === 'speaker' ? 'currentColor' : 'none'} />
+              <circle cx="12" cy="6.6" r="1.6" fill={outputMode === 'speaker' ? 'currentColor' : 'none'} />
+            </svg>
+            <span className="btn-badge">{outputMode === 'speaker' ? '箱' : '耳'}</span>
           </button>
           <button
             className={`player-btn eq-btn ${eqEnabled ? 'active' : ''}`}

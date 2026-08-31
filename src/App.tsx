@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Page, Song, ToastMessage } from './types';
 import { generateId } from './utils/format';
 import { usePlayer } from './hooks/usePlayer';
@@ -37,7 +37,14 @@ export default function App() {
   }, []);
 
   const eq = useEqualizer();
-  const player = usePlayer(addToast, { filtersRef: eq.filtersRef, createFilters: eq.createFilters });
+  // Stable bridge object: usePlayer keys its graph rebuild off this, and a fresh
+  // object literal every render used to re-route the whole audio chain four times
+  // a second while a track played.
+  const eqBridge = useMemo(
+    () => ({ filtersRef: eq.filtersRef, preampRef: eq.preampRef, createFilters: eq.createFilters, createPreamp: eq.createPreamp }),
+    [eq.filtersRef, eq.preampRef, eq.createFilters, eq.createPreamp],
+  );
+  const player = usePlayer(addToast, eqBridge);
   const searchHook = useSearch();
   const userHook = useUser(addToast);
 
@@ -201,13 +208,15 @@ export default function App() {
         duration={player.duration}
         volume={player.volume}
         playMode={player.playMode}
-        spatialAudio={player.spatialAudio}
+        crossfeedMode={player.crossfeedMode}
+        outputMode={player.outputMode}
         loading={player.loading}
         onTogglePlay={player.togglePlay}
         onSeek={player.seek}
         onSetVolume={player.setVolume}
         onSetPlayMode={player.setPlayMode}
-        onToggleSpatial={player.toggleSpatialAudio}
+        onCycleCrossfeed={player.cycleCrossfeed}
+        onToggleOutput={player.toggleOutputMode}
         onNext={player.playNext}
         onPrev={player.playPrev}
         onShowLyrics={() => setShowLyrics(true)}
@@ -246,10 +255,15 @@ export default function App() {
         onSetEnabled={(on) => {
           eq.setEnabled(on);
           if (on && player.isPlaying) {
-            player.activateWebAudio(player.spatialAudio);
+            player.activateWebAudio();
           }
         }}
         onApplyPreset={eq.applyPreset}
+        deEsser={player.deEsser}
+        loudnessComp={player.loudnessComp}
+        outputMode={player.outputMode}
+        onToggleDeEsser={player.toggleDeEsser}
+        onToggleLoudnessComp={player.toggleLoudnessComp}
       />
 
       <Toast toasts={toasts} removeToast={removeToast} />

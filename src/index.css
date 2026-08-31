@@ -1191,11 +1191,46 @@ a {
 }
 
 /* Spatial Audio Button */
-.spatial-btn.active {
+.spatial-btn.active,
+.speaker-btn.active {
   color: var(--primary);
 }
 
-.spatial-btn.active:hover {
+/* Output-chain buttons carry a one-character state badge, because crossfeed has
+   four positions and a lit icon alone cannot say which one is active. */
+.spatial-btn,
+.speaker-btn {
+  position: relative;
+}
+
+.spatial-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-badge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  font-size: 9px;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: inherit;
+  pointer-events: none;
+}
+
+.spatial-btn.active .btn-badge,
+.speaker-btn.active .btn-badge {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.spatial-btn.active:hover,
+.speaker-btn.active:hover {
   color: var(--primary-hover);
 }
 
@@ -1823,6 +1858,63 @@ a {
   background: var(--primary);
   border-color: var(--primary);
   color: white;
+}
+
+.eq-subtitle {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.eq-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+
+.eq-switch-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.eq-switch {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: 0.2s;
+  white-space: nowrap;
+}
+
+.eq-switch:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.eq-switch.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.eq-switch:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.eq-switch-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.75;
 }
 
 /* EQ Body - Grid Layout */

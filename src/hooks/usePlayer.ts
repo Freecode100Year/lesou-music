@@ -2,12 +2,68 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Song, SongDetail, PlayMode } from '../types';
 import { API, CACHE_TTL } from '../config';
 import { requestCache } from '../utils/cache';
-import { getVolume, setVolume as saveVolume, getPlayMode, setPlayMode as savePlayMode, getSpatialAudio, setSpatialAudio as saveSpatialAudio, getGainMultiplier, setGainMultiplier as saveGainMultiplier } from '../utils/storage';
+import {
+  getVolume, setVolume as saveVolume,
+  getPlayMode, setPlayMode as savePlayMode,
+  getCrossfeedMode, setCrossfeedMode as saveCrossfeedMode, CrossfeedMode,
+  getDeEsser, setDeEsser as saveDeEsser,
+  getLoudnessComp, setLoudnessComp as saveLoudnessComp,
+  getOutputMode, setOutputMode as saveOutputMode, OutputMode,
+  getGainMultiplier, setGainMultiplier as saveGainMultiplier,
+} from '../utils/storage';
 
 interface EqualizerBridge {
   filtersRef: React.MutableRefObject<BiquadFilterNode[]>;
+  preampRef: React.MutableRefObject<GainNode | null>;
   createFilters: (ctx: AudioContext) => BiquadFilterNode[];
+  createPreamp: (ctx: AudioContext) => GainNode;
 }
+
+export const CROSSFEED_LABELS: Record<CrossfeedMode, string> = {
+  off: '关',
+  light: '轻',
+  medium: '中',
+  strong: '强',
+};
+
+const CROSSFEED_ORDER: CrossfeedMode[] = ['off', 'light', 'medium', 'strong'];
+
+// Bauer/Meier crossfeed settings. A lower corner and a hotter cross feed the far
+// ear more, which pulls a hard-panned mix further out of the middle of the head
+// at the cost of some width.
+const CROSSFEED_PARAMS: Record<Exclude<CrossfeedMode, 'off'>, { cutoff: number; level: number }> = {
+  light: { cutoff: 800, level: 0.25 },
+  medium: { cutoff: 700, level: 0.40 },
+  strong: { cutoff: 620, level: 0.55 },
+};
+
+// De-esser crossover. An in-ear seals the canal, which moves its main resonance
+// up to roughly 6-8 kHz and puts it right on top of the sibilance that 320 kbps
+// encoding already roughens. Splitting there and compressing only the top lets
+// the band breathe when there is nothing harsh to catch.
+const DEESS_CROSSOVER_HZ = 5500;
+
+// Marshall's powered cabinets, tone controls centred: a big low shelf for the
+// thump, a scoop where the box would otherwise sound boxy, a presence lift that
+// gives guitars and vocals their bite, and a deliberately smooth top. Applied as
+// its own block so it stacks on top of whatever the 31-band EQ is set to.
+const MARSHALL_VOICING: Array<{
+  type: BiquadFilterType; freq: number; q: number; gain: number;
+}> = [
+  { type: 'lowshelf', freq: 90, q: 0.707, gain: 4.5 },
+  { type: 'peaking', freq: 160, q: 1.0, gain: 2.0 },
+  { type: 'peaking', freq: 400, q: 1.2, gain: -1.5 },
+  { type: 'peaking', freq: 1200, q: 1.0, gain: 1.0 },
+  { type: 'peaking', freq: 3200, q: 1.4, gain: 2.5 },
+  { type: 'peaking', freq: 6500, q: 1.5, gain: -1.5 },
+  { type: 'highshelf', freq: 11000, q: 0.707, gain: -2.0 },
+];
+// Trim that keeps the voicing's own boost out of the limiter.
+const MARSHALL_TRIM = Math.pow(10, -5 / 20);
+
+// Subsonic cut. Headphones reproduce rumble faithfully and it does nothing but
+// eat headroom; a speaker cannot reproduce it at all and just distorts trying.
+const SUBSONIC_HZ = { headphone: 20, speaker: 55 };
 
 export function usePlayer(
   addToast: (text: string, type?: 'success' | 'error' | 'info') => void,
@@ -17,8 +73,16 @@ export function usePlayer(
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const volumeGainRef = useRef<GainNode | null>(null);
+  const envGainRef = useRef<GainNode | null>(null);
+  const highpassRef = useRef<BiquadFilterNode | null>(null);
   const webAudioActiveRef = useRef(false);
-  const mediaActionsRef = useRef<{ next: () => void; prev: () => void }>({ next: () => {}, prev: () => {} });
+  const topologyRef = useRef<string | null>(null);
+  const mediaActionsRef = useRef<{ next: () => void; prev: () => void; pause: () => void }>({
+    next: () => {}, prev: () => {}, pause: () => {},
+  });
+  const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const crossfeedRef = useRef<{
     splitter: ChannelSplitterNode;
     merger: ChannelMergerNode;
@@ -30,9 +94,20 @@ export function usePlayer(
     crossR: GainNode;
     output: GainNode;
   } | null>(null);
+  const deEsserRef = useRef<{
+    input: GainNode;
+    lowA: BiquadFilterNode;
+    lowB: BiquadFilterNode;
+    highA: BiquadFilterNode;
+    highB: BiquadFilterNode;
+    comp: DynamicsCompressorNode;
+    output: GainNode;
+  } | null>(null);
+  const voicingRef = useRef<{ input: BiquadFilterNode; output: GainNode } | null>(null);
+  const contourRef = useRef<{ low: BiquadFilterNode; high: BiquadFilterNode } | null>(null);
   const limiterRef = useRef<DynamicsCompressorNode | null>(null);
   const loudnessGainRef = useRef<GainNode | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const meterRef = useRef<{ shelf: BiquadFilterNode; hp: BiquadFilterNode; analyser: AnalyserNode } | null>(null);
   const loudnessTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -42,11 +117,28 @@ export function usePlayer(
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(getVolume());
   const [playMode, setPlayModeState] = useState<PlayMode>(getPlayMode() as PlayMode);
-  const [spatialAudio, setSpatialAudioState] = useState(getSpatialAudio());
+  const [crossfeedMode, setCrossfeedModeState] = useState<CrossfeedMode>(getCrossfeedMode());
+  const [deEsser, setDeEsserState] = useState(getDeEsser());
+  const [loudnessComp, setLoudnessCompState] = useState(getLoudnessComp());
+  const [outputMode, setOutputModeState] = useState<OutputMode>(getOutputMode());
   const [gainMultiplier, setGainMultiplierState] = useState(getGainMultiplier());
   const [queue, setQueue] = useState<Song[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
+
+  // Everything the audio graph needs is mirrored into refs. The graph used to be
+  // rebuilt from an effect whose dependency list included the equalizer bridge
+  // object, which React re-creates on every render - so with `timeupdate` firing
+  // four times a second the whole chain was being disconnected and reconnected
+  // mid-playback, several times per second.
+  const volumeRef = useRef(volume);
+  const gainMultiplierRef = useRef(gainMultiplier);
+  const crossfeedRefMode = useRef(crossfeedMode);
+  const deEsserModeRef = useRef(deEsser);
+  const loudnessCompRef = useRef(loudnessComp);
+  const outputModeRef = useRef(outputMode);
+  const equalizerRef = useRef(equalizer);
+  equalizerRef.current = equalizer;
 
   const disconnectSafe = useCallback((node: AudioNode) => {
     try { node.disconnect(); } catch {}
@@ -55,10 +147,65 @@ export function usePlayer(
   const ensureGainNode = useCallback((ctx: AudioContext) => {
     if (!gainNodeRef.current) {
       gainNodeRef.current = ctx.createGain();
-      gainNodeRef.current.gain.value = gainMultiplier;
+      gainNodeRef.current.gain.value = gainMultiplierRef.current;
     }
     return gainNodeRef.current;
-  }, [gainMultiplier]);
+  }, []);
+
+  const ensureVolumeGain = useCallback((ctx: AudioContext) => {
+    if (!volumeGainRef.current) {
+      volumeGainRef.current = ctx.createGain();
+      // Perceptual taper: a linear slider spends most of its travel in a range
+      // that already sounds like full volume. Squaring puts the halfway point at
+      // -12 dB, which is roughly where "half as loud" actually is.
+      volumeGainRef.current.gain.value = volumeRef.current * volumeRef.current;
+    }
+    return volumeGainRef.current;
+  }, []);
+
+  // Short ramp applied around every start, stop and track change. Switching an
+  // audio element's source mid-waveform is a step discontinuity, and a step is a
+  // click - inaudible on a laptop speaker, unmistakable in a sealed in-ear.
+  const ensureEnvGain = useCallback((ctx: AudioContext) => {
+    if (!envGainRef.current) {
+      envGainRef.current = ctx.createGain();
+      envGainRef.current.gain.value = 1;
+    }
+    return envGainRef.current;
+  }, []);
+
+  const fadeEnv = useCallback((target: number, ms: number) => {
+    const ctx = audioCtxRef.current;
+    const env = envGainRef.current;
+    if (!ctx || !env) return;
+    const now = ctx.currentTime;
+    env.gain.cancelScheduledValues(now);
+    env.gain.setValueAtTime(env.gain.value, now);
+    if (ms <= 0) {
+      env.gain.setValueAtTime(target, now);
+    } else {
+      env.gain.linearRampToValueAtTime(target, now + ms / 1000);
+    }
+  }, []);
+
+  // Toggling the de-esser or the output mode changes the shape of the graph, and
+  // re-routing mid-waveform clicks just like a source swap does. Duck across it.
+  const duckThroughRebuild = useCallback(() => {
+    if (!webAudioActiveRef.current) return;
+    fadeEnv(0, 25);
+    setTimeout(() => fadeEnv(1, 70), 90);
+  }, [fadeEnv]);
+
+  const ensureHighpass = useCallback((ctx: AudioContext) => {
+    if (!highpassRef.current) {
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = SUBSONIC_HZ[outputModeRef.current];
+      hp.Q.value = 0.707;
+      highpassRef.current = hp;
+    }
+    return highpassRef.current;
+  }, []);
 
   // Headphone crossfeed (Bauer/Meier style).
   //
@@ -68,18 +215,9 @@ export function usePlayer(
   // filtered, delayed copy across restores that and relieves the in-head
   // localisation that makes wide mixes tiring.
   //
-  // The previous implementation got all three details wrong: the cross gain was
-  // negative (phase-inverted), which cancelled the centre image where vocals and
-  // bass live; the delay sat on the main path instead of the cross path, applying
-  // a fixed 400 us interaural difference that pushed the whole mix ~55 degrees left;
-  // and a white-noise convolution reverb added smear with no early reflections.
-  const CROSSFEED_CUTOFF_HZ = 700;   // above this the head shadows the far ear
-  const CROSSFEED_LEVEL = 0.4;       // -8 dB into the opposite ear
-  // Adding a cross copy lifts correlated (centre) content by (1 + level). Cutting
-  // the direct path by the same amount *below the crossfeed cutoff only* keeps the
-  // response flat; a flat gain would have dragged everything above 700 Hz down 2.9 dB.
-  const CROSSFEED_COMP_DB = -20 * Math.log10(1 + CROSSFEED_LEVEL);
-
+  // The cross gain must stay positive: a phase-inverted copy cancels the centre
+  // image where the vocal and the bass live. The delay belongs on the cross path,
+  // never on the direct one, or the whole mix shifts to one side.
   const ensureCrossfeedNodes = useCallback((ctx: AudioContext) => {
     if (crossfeedRef.current) return crossfeedRef.current;
 
@@ -91,31 +229,30 @@ export function usePlayer(
     const makeShelf = () => {
       const f = ctx.createBiquadFilter();
       f.type = 'lowshelf';
-      f.frequency.value = CROSSFEED_CUTOFF_HZ;
-      f.gain.value = CROSSFEED_COMP_DB;
+      f.frequency.value = CROSSFEED_PARAMS.medium.cutoff;
+      f.gain.value = 0;
       return f;
     };
     const directL = makeShelf();
     const directR = makeShelf();
 
-    // No explicit delay line: a 2nd-order 700 Hz lowpass already carries ~330 us
-    // of group delay in its passband, which is the real acoustic path around the
-    // head. Adding a delay on top pushed the centre notch down to -5.7 dB.
+    // No explicit delay line: a 2nd-order lowpass at this corner already carries
+    // ~330 us of group delay in its passband, which is the real acoustic path
+    // around the head. Adding a delay on top notches the centre.
     const makeLowpass = () => {
       const f = ctx.createBiquadFilter();
       f.type = 'lowpass';
-      f.frequency.value = CROSSFEED_CUTOFF_HZ;
+      f.frequency.value = CROSSFEED_PARAMS.medium.cutoff;
       f.Q.value = 0.707;
       return f;
     };
     const lpL = makeLowpass();
     const lpR = makeLowpass();
 
-    // In phase, unlike the old -0.15 which cancelled the centre image.
     const crossL = ctx.createGain();
     const crossR = ctx.createGain();
-    crossL.gain.value = CROSSFEED_LEVEL;
-    crossR.gain.value = CROSSFEED_LEVEL;
+    crossL.gain.value = 0;
+    crossR.gain.value = 0;
 
     const output = ctx.createGain();
     output.gain.value = 1.0;
@@ -141,43 +278,186 @@ export function usePlayer(
     return nodes;
   }, []);
 
-  // Brick-wall safety net. The EQ can reach +39 dB on a single band and the user
-  // gain adds up to 3x on top, so without this the chain clips hard into the
-  // headphones.
+  const applyCrossfeedParams = useCallback((mode: CrossfeedMode) => {
+    const nodes = crossfeedRef.current;
+    const ctx = audioCtxRef.current;
+    if (!nodes || !ctx) return;
+    if (mode === 'off') {
+      nodes.crossL.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
+      nodes.crossR.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
+      nodes.directL.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
+      nodes.directR.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
+      return;
+    }
+    const { cutoff, level } = CROSSFEED_PARAMS[mode];
+    // Adding a cross copy lifts correlated (centre) content by (1 + level).
+    // Cutting the direct path by the same amount below the crossfeed corner only
+    // keeps the response flat; a flat gain would drag the whole top end down too.
+    const compDb = -20 * Math.log10(1 + level);
+    const t = ctx.currentTime;
+    nodes.lpL.frequency.setTargetAtTime(cutoff, t, 0.02);
+    nodes.lpR.frequency.setTargetAtTime(cutoff, t, 0.02);
+    nodes.directL.frequency.setTargetAtTime(cutoff, t, 0.02);
+    nodes.directR.frequency.setTargetAtTime(cutoff, t, 0.02);
+    nodes.directL.gain.setTargetAtTime(compDb, t, 0.02);
+    nodes.directR.gain.setTargetAtTime(compDb, t, 0.02);
+    nodes.crossL.gain.setTargetAtTime(level, t, 0.02);
+    nodes.crossR.gain.setTargetAtTime(level, t, 0.02);
+  }, []);
+
+  // Band-split de-esser. A Linkwitz-Riley 4th-order crossover (two cascaded
+  // Butterworth sections per side) sums back to a flat magnitude response, so
+  // with the compressor idle the block is inaudible; when sibilance hits, only
+  // the top band ducks and the body of the voice is untouched.
+  const ensureDeEsserNodes = useCallback((ctx: AudioContext) => {
+    if (deEsserRef.current) return deEsserRef.current;
+    const input = ctx.createGain();
+    const output = ctx.createGain();
+
+    const makeLp = () => {
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = DEESS_CROSSOVER_HZ;
+      f.Q.value = 0.707;
+      return f;
+    };
+    const makeHp = () => {
+      const f = ctx.createBiquadFilter();
+      f.type = 'highpass';
+      f.frequency.value = DEESS_CROSSOVER_HZ;
+      f.Q.value = 0.707;
+      return f;
+    };
+    const lowA = makeLp();
+    const lowB = makeLp();
+    const highA = makeHp();
+    const highB = makeHp();
+
+    const comp = ctx.createDynamicsCompressor();
+    // The high band on its own sits far below full scale, so the threshold has
+    // to be low to catch anything. Web Audio's compressor applies no makeup
+    // gain, which is what a de-esser wants: reduction only.
+    comp.threshold.value = -32;
+    comp.knee.value = 6;
+    comp.ratio.value = 4;
+    comp.attack.value = 0.002;
+    comp.release.value = 0.06;
+
+    input.connect(lowA);
+    lowA.connect(lowB);
+    lowB.connect(output);
+
+    input.connect(highA);
+    highA.connect(highB);
+    highB.connect(comp);
+    comp.connect(output);
+
+    deEsserRef.current = { input, lowA, lowB, highA, highB, comp, output };
+    return deEsserRef.current;
+  }, []);
+
+  const ensureVoicingNodes = useCallback((ctx: AudioContext) => {
+    if (voicingRef.current) return voicingRef.current;
+    const filters = MARSHALL_VOICING.map((spec) => {
+      const f = ctx.createBiquadFilter();
+      f.type = spec.type;
+      f.frequency.value = spec.freq;
+      f.Q.value = spec.q;
+      f.gain.value = spec.gain;
+      return f;
+    });
+    for (let i = 0; i < filters.length - 1; i++) filters[i].connect(filters[i + 1]);
+    const output = ctx.createGain();
+    output.gain.value = MARSHALL_TRIM;
+    filters[filters.length - 1].connect(output);
+    voicingRef.current = { input: filters[0], output };
+    return voicingRef.current;
+  }, []);
+
+  // Equal-loudness compensation. In-ears isolate well, so people listen quietly,
+  // and the ear's sensitivity to bass falls away faster than anything else as
+  // level drops (ISO 226). These two shelves open up as the volume control comes
+  // down and sit at 0 dB when it is all the way up.
+  const ensureContourNodes = useCallback((ctx: AudioContext) => {
+    if (contourRef.current) return contourRef.current;
+    const low = ctx.createBiquadFilter();
+    low.type = 'lowshelf';
+    low.frequency.value = 120;
+    low.gain.value = 0;
+    const high = ctx.createBiquadFilter();
+    high.type = 'highshelf';
+    high.frequency.value = 8000;
+    high.gain.value = 0;
+    low.connect(high);
+    contourRef.current = { low, high };
+    return contourRef.current;
+  }, []);
+
+  const applyContour = useCallback(() => {
+    const nodes = contourRef.current;
+    const ctx = audioCtxRef.current;
+    if (!nodes || !ctx) return;
+    const on = loudnessCompRef.current;
+    const effective = Math.min(1, Math.max(0.001, volumeRef.current * volumeRef.current * gainMultiplierRef.current));
+    const attenDb = 20 * Math.log10(effective);
+    const lowDb = on ? Math.min(6, Math.max(0, -attenDb * 0.35)) : 0;
+    const highDb = on ? Math.min(2.5, Math.max(0, -attenDb * 0.15)) : 0;
+    nodes.low.gain.setTargetAtTime(lowDb, ctx.currentTime, 0.05);
+    nodes.high.gain.setTargetAtTime(highDb, ctx.currentTime, 0.05);
+  }, []);
+
+  // Brick-wall safety net, sitting after the volume control so it only ever acts
+  // on what actually reaches the DAC. With the EQ preamp and the voicing trim
+  // doing their job it should almost never engage.
   const ensureLimiter = useCallback((ctx: AudioContext) => {
     if (!limiterRef.current) {
       const limiter = ctx.createDynamicsCompressor();
-      limiter.threshold.value = -3;
+      limiter.threshold.value = -1.5;
       limiter.knee.value = 0;
       limiter.ratio.value = 20;
-      limiter.attack.value = 0.002;
-      limiter.release.value = 0.12;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.2;
       limiterRef.current = limiter;
     }
     return limiterRef.current;
   }, []);
 
-  // Slow RMS levelling. The three sources are mastered at noticeably different
-  // levels, so without this every track change is a volume jump.
+  // Slow loudness levelling. The sources are mastered at noticeably different
+  // levels, so without this every track change is a volume jump. The measurement
+  // tap is K-weighted (BS.1770): a shelf for the head's response plus a subsonic
+  // cut, so the meter hears the track roughly the way the listener does instead
+  // of being dominated by whatever has the most bass.
   const ensureLoudnessNodes = useCallback((ctx: AudioContext) => {
     if (!loudnessGainRef.current) {
       loudnessGainRef.current = ctx.createGain();
       loudnessGainRef.current.gain.value = 1.0;
     }
-    if (!analyserRef.current) {
+    if (!meterRef.current) {
+      const shelf = ctx.createBiquadFilter();
+      shelf.type = 'highshelf';
+      shelf.frequency.value = 1681;
+      shelf.gain.value = 4;
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 38;
+      hp.Q.value = 0.5;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 2048;
-      analyserRef.current = analyser;
+      shelf.connect(hp);
+      hp.connect(analyser);
+      meterRef.current = { shelf, hp, analyser };
     }
-    return { loudnessGain: loudnessGainRef.current, analyser: analyserRef.current };
+    return { loudnessGain: loudnessGainRef.current, meter: meterRef.current };
   }, []);
 
-  const activateWebAudio = useCallback((useSpatial: boolean) => {
+  const activateWebAudio = useCallback(() => {
     if (!audioRef.current) return;
 
     let ctx = audioCtxRef.current;
     if (!ctx) {
-      ctx = new AudioContext();
+      // A playback latency hint buys bigger render quanta, which is what keeps a
+      // 31-band chain from glitching on a phone.
+      ctx = new AudioContext({ latencyHint: 'playback' });
       audioCtxRef.current = ctx;
     }
 
@@ -189,66 +469,113 @@ export function usePlayer(
       }
     }
 
+    const isSpeaker = outputModeRef.current === 'speaker';
+    const useCrossfeed = !isSpeaker && crossfeedRefMode.current !== 'off';
+    const useDeEsser = !isSpeaker && deEsserModeRef.current;
+    const topology = `${isSpeaker ? 'spk' : 'hp'}|${useCrossfeed ? 'cf' : '-'}|${useDeEsser ? 'de' : '-'}`;
+
+    if (webAudioActiveRef.current && topologyRef.current === topology) {
+      ctx.resume().catch(() => {});
+      return;
+    }
+
     const source = sourceNodeRef.current;
+    const eq = equalizerRef.current;
+    const highpass = ensureHighpass(ctx);
     const gainNode = ensureGainNode(ctx);
+    const volumeGain = ensureVolumeGain(ctx);
+    const envGain = ensureEnvGain(ctx);
     const limiter = ensureLimiter(ctx);
-    const { loudnessGain, analyser } = ensureLoudnessNodes(ctx);
+    const contour = ensureContourNodes(ctx);
+    const { loudnessGain, meter } = ensureLoudnessNodes(ctx);
 
-    const eqFilters = equalizer.filtersRef.current.length > 0
-      ? equalizer.filtersRef.current
-      : equalizer.createFilters(ctx);
-
+    const eqFilters = eq.filtersRef.current.length > 0 ? eq.filtersRef.current : eq.createFilters(ctx);
     const eqFirst = eqFilters[0];
     const eqLast = eqFilters[eqFilters.length - 1];
+    const eqPreamp = eq.createPreamp(ctx);
 
-    disconnectSafe(source);
-    if (eqLast) disconnectSafe(eqLast);
-    disconnectSafe(gainNode);
-    disconnectSafe(loudnessGain);
-    disconnectSafe(limiter);
-    if (crossfeedRef.current) {
-      disconnectSafe(crossfeedRef.current.output);
+    // Tear the old routing down before wiring the new one. Only the outputs of
+    // each block need clearing; the wiring inside a block never changes.
+    [source, highpass, eqLast, eqPreamp, contour.high, loudnessGain, gainNode, volumeGain, envGain, limiter]
+      .forEach(disconnectSafe);
+    if (crossfeedRef.current) disconnectSafe(crossfeedRef.current.output);
+    if (deEsserRef.current) disconnectSafe(deEsserRef.current.output);
+    if (voicingRef.current) disconnectSafe(voicingRef.current.output);
+
+    // source -> subsonic -> EQ -> EQ preamp -> [voicing | de-esser]
+    //        -> [crossfeed] -> loudness -> contour -> user gain -> volume
+    //        -> fade envelope -> limiter -> out
+    source.connect(highpass);
+    highpass.connect(eqFirst);
+    eqLast.connect(eqPreamp);
+
+    let tail: AudioNode = eqPreamp;
+    if (isSpeaker) {
+      const voicing = ensureVoicingNodes(ctx);
+      tail.connect(voicing.input);
+      tail = voicing.output;
+    } else if (useDeEsser) {
+      const de = ensureDeEsserNodes(ctx);
+      tail.connect(de.input);
+      tail = de.output;
     }
 
-    // source -> EQ -> [crossfeed] -> loudness -> user gain -> limiter -> out
-    source.connect(eqFirst);
-
-    if (useSpatial) {
+    if (useCrossfeed) {
       const cf = ensureCrossfeedNodes(ctx);
-      eqLast.connect(cf.splitter);
-      cf.output.connect(loudnessGain);
-    } else {
-      eqLast.connect(loudnessGain);
+      tail.connect(cf.splitter);
+      tail = cf.output;
     }
 
-    loudnessGain.connect(gainNode);
-    gainNode.connect(limiter);
+    tail.connect(loudnessGain);
+    loudnessGain.connect(contour.low);
+    contour.high.connect(gainNode);
+    gainNode.connect(volumeGain);
+    volumeGain.connect(envGain);
+    envGain.connect(limiter);
     limiter.connect(ctx.destination);
 
-    // Tap for RMS measurement; an analyser has no effect on the signal it sees.
-    loudnessGain.connect(analyser);
+    // Measurement tap, ahead of the volume control so the leveller cannot end up
+    // fighting the user's own volume changes. An analyser has no effect on what
+    // passes through it.
+    loudnessGain.connect(meter.shelf);
+
+    // Volume now lives in the graph, so the element itself runs wide open.
+    audioRef.current.volume = 1;
+    volumeGain.gain.value = volumeRef.current * volumeRef.current;
+    gainNode.gain.value = gainMultiplierRef.current;
+    highpass.frequency.value = SUBSONIC_HZ[outputModeRef.current];
+    applyCrossfeedParams(useCrossfeed ? crossfeedRefMode.current : 'off');
+    applyContour();
 
     webAudioActiveRef.current = true;
+    topologyRef.current = topology;
     ctx.resume().catch(() => {});
-  }, [disconnectSafe, ensureGainNode, ensureCrossfeedNodes, ensureLimiter, ensureLoudnessNodes, equalizer]);
+  }, [
+    disconnectSafe, ensureHighpass, ensureGainNode, ensureVolumeGain, ensureEnvGain,
+    ensureLimiter, ensureContourNodes, ensureLoudnessNodes, ensureCrossfeedNodes,
+    ensureDeEsserNodes, ensureVoicingNodes, applyCrossfeedParams, applyContour,
+  ]);
 
-  // Measure the post-EQ signal and walk loudnessGain towards a common level.
-  // Deliberately slow (2 s time constant, +/-6 dB of authority) so it levels
+  // Walk loudnessGain towards a common level. Deliberately slow (3 s time
+  // constant over a 3 s measurement window, +/-7 dB of authority) so it levels
   // between tracks without audibly pumping inside one.
   useEffect(() => {
-    const TARGET_RMS = 0.1;      // about -20 dBFS
+    const TARGET_RMS = 0.1;      // about -20 dBFS, K-weighted
     const MIN_RMS = 0.005;       // below this treat it as silence and hold
-    const MAX_GAIN = 2.0;        // +6 dB
-    const MIN_GAIN = 0.5;        // -6 dB
+    const MAX_GAIN = 2.2;
+    const MIN_GAIN = 0.45;
+    const WINDOW = 6;            // ticks of 500 ms
+
+    const history: number[] = [];
 
     const tick = () => {
-      const analyser = analyserRef.current;
+      const meter = meterRef.current;
       const gain = loudnessGainRef.current;
       const ctx = audioCtxRef.current;
-      if (!analyser || !gain || !ctx || !isPlaying) return;
+      if (!meter || !gain || !ctx || !isPlaying) return;
 
-      const buf = new Float32Array(analyser.fftSize);
-      analyser.getFloatTimeDomainData(buf);
+      const buf = new Float32Array(meter.analyser.fftSize);
+      meter.analyser.getFloatTimeDomainData(buf);
 
       let sum = 0;
       for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
@@ -257,9 +584,16 @@ export function usePlayer(
 
       // rms here is already scaled by the current gain, so divide it back out.
       const current = gain.gain.value || 1;
-      const raw = rms / current;
-      const wanted = Math.max(MIN_GAIN, Math.min(MAX_GAIN, TARGET_RMS / raw));
-      gain.gain.setTargetAtTime(wanted, ctx.currentTime, 2.0);
+      history.push(rms / current);
+      if (history.length > WINDOW) history.shift();
+      if (history.length < 3) return;
+
+      const mean = Math.sqrt(history.reduce((a, v) => a + v * v, 0) / history.length);
+      const wanted = Math.max(MIN_GAIN, Math.min(MAX_GAIN, TARGET_RMS / mean));
+      // Ignore anything under half a dB; constant micro-adjustment is audible as
+      // a slow breathing on sustained material.
+      if (Math.abs(20 * Math.log10(wanted / current)) < 0.5) return;
+      gain.gain.setTargetAtTime(wanted, ctx.currentTime, 3.0);
     };
 
     loudnessTimerRef.current = setInterval(tick, 500);
@@ -278,13 +612,18 @@ export function usePlayer(
     if (!audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.crossOrigin = 'anonymous';
-      audioRef.current.volume = volume;
+      audioRef.current.preload = 'auto';
+      audioRef.current.volume = volumeRef.current * volumeRef.current;
     }
     const audio = audioRef.current;
 
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onDurationChange = () => setDuration(audio.duration || 0);
     const onPlay = () => setIsPlaying(true);
+    // Fading in from the `playing` event rather than from the play() call keeps
+    // the envelope honest whichever route started playback - the transport
+    // buttons, the lock screen, or the end of the previous track.
+    const onPlaying = () => { setIsPlaying(true); fadeEnv(1, 90); };
     const onPause = () => setIsPlaying(false);
     const onError = () => {
       addToast('播放失败，请尝试其他源', 'error');
@@ -294,6 +633,7 @@ export function usePlayer(
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('durationchange', onDurationChange);
     audio.addEventListener('play', onPlay);
+    audio.addEventListener('playing', onPlaying);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('error', onError);
 
@@ -301,12 +641,11 @@ export function usePlayer(
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('durationchange', onDurationChange);
       audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('playing', onPlaying);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('error', onError);
     };
-  }, []);
-
-
+  }, [addToast, fadeEnv]);
 
   const fetchSongUrl = useCallback(async (song: Song): Promise<string | null> => {
     const cacheKey = `song_url_${song.sourceType}_${song.source}_${song.id}`;
@@ -365,6 +704,12 @@ export function usePlayer(
     setLoading(true);
     setCurrentSong(song);
     setSongDetail(null);
+    if (pauseTimerRef.current) {
+      clearTimeout(pauseTimerRef.current);
+      pauseTimerRef.current = null;
+    }
+    // Duck before the source is swapped; `playing` brings the envelope back up.
+    fadeEnv(0, 30);
 
     if (newQueue !== undefined && index !== undefined) {
       setQueue(newQueue);
@@ -374,6 +719,7 @@ export function usePlayer(
     const url = await fetchSongUrl(song);
     if (!url) {
       addToast('无法获取播放地址', 'error');
+      fadeEnv(1, 30);
       setLoading(false);
       return;
     }
@@ -386,16 +732,37 @@ export function usePlayer(
       audioRef.current.play().catch(() => {});
     }
     setLoading(false);
-  }, [fetchSongUrl, addToast, proxyUrl]);
+  }, [fetchSongUrl, addToast, proxyUrl, fadeEnv]);
+
+  const pauseWithFade = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+    if (!webAudioActiveRef.current) {
+      audio.pause();
+      return;
+    }
+    fadeEnv(0, 40);
+    pauseTimerRef.current = setTimeout(() => {
+      pauseTimerRef.current = null;
+      audio.pause();
+    }, 55);
+  }, [fadeEnv]);
 
   const togglePlay = useCallback(() => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio) return;
     if (isPlaying) {
-      audioRef.current.pause();
+      pauseWithFade();
     } else {
-      audioRef.current.play().catch(() => {});
+      if (pauseTimerRef.current) {
+        clearTimeout(pauseTimerRef.current);
+        pauseTimerRef.current = null;
+      }
+      fadeEnv(0, 0);
+      audio.play().catch(() => {});
     }
-  }, [isPlaying]);
+  }, [isPlaying, pauseWithFade, fadeEnv]);
 
   const seek = useCallback((time: number) => {
     if (audioRef.current) {
@@ -406,11 +773,17 @@ export function usePlayer(
   const setVolume = useCallback((vol: number) => {
     const v = Math.max(0, Math.min(1, vol));
     setVolumeState(v);
+    volumeRef.current = v;
     saveVolume(v);
-    if (audioRef.current) {
-      audioRef.current.volume = v;
+    const perceptual = v * v;
+    if (webAudioActiveRef.current && volumeGainRef.current && audioCtxRef.current) {
+      volumeGainRef.current.gain.setTargetAtTime(perceptual, audioCtxRef.current.currentTime, 0.02);
+      if (audioRef.current) audioRef.current.volume = 1;
+    } else if (audioRef.current) {
+      audioRef.current.volume = perceptual;
     }
-  }, []);
+    applyContour();
+  }, [applyContour]);
 
   const setPlayMode = useCallback((mode: PlayMode) => {
     setPlayModeState(mode);
@@ -420,11 +793,13 @@ export function usePlayer(
   const setGainMultiplier = useCallback((gain: number) => {
     const next = Math.max(1, Math.min(3, Number.isFinite(gain) ? gain : 1));
     setGainMultiplierState(next);
+    gainMultiplierRef.current = next;
     saveGainMultiplier(next);
-    if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = next;
+    if (gainNodeRef.current && audioCtxRef.current) {
+      gainNodeRef.current.gain.setTargetAtTime(next, audioCtxRef.current.currentTime, 0.02);
     }
-  }, []);
+    applyContour();
+  }, [applyContour]);
 
   const playNext = useCallback(() => {
     if (queue.length === 0) return;
@@ -450,13 +825,16 @@ export function usePlayer(
     playSong(queue[prevIndex], queue, prevIndex);
   }, [queue, queueIndex, playMode, playSong]);
 
-  useEffect(() => { mediaActionsRef.current = { next: playNext, prev: playPrev }; }, [playNext, playPrev]);
+  useEffect(() => {
+    mediaActionsRef.current = { next: playNext, prev: playPrev, pause: pauseWithFade };
+  }, [playNext, playPrev, pauseWithFade]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     const onEnded = () => {
       if (playMode === 'repeat-one') {
+        fadeEnv(0, 0);
         audio.currentTime = 0;
         audio.play().catch(() => {});
       } else {
@@ -465,7 +843,7 @@ export function usePlayer(
     };
     audio.addEventListener('ended', onEnded);
     return () => audio.removeEventListener('ended', onEnded);
-  }, [playMode, playNext]);
+  }, [playMode, playNext, fadeEnv]);
 
   const addToQueue = useCallback((songs: Song[]) => {
     setQueue((prev) => [...prev, ...songs]);
@@ -490,29 +868,61 @@ export function usePlayer(
     setQueueIndex(-1);
   }, []);
 
-  const toggleSpatialAudio = useCallback(() => {
-    const next = !spatialAudio;
-    setSpatialAudioState(next);
-    saveSpatialAudio(next);
-    if (next) {
-      activateWebAudio(true);
-      addToast('耳机交叉馈送 已开启', 'success');
-    } else {
-      if (webAudioActiveRef.current) {
-        activateWebAudio(false);
-      }
-      addToast('耳机交叉馈送 已关闭', 'info');
+  const cycleCrossfeed = useCallback(() => {
+    if (outputModeRef.current === 'speaker') {
+      addToast('音箱外放模式下不需要交叉馈送', 'info');
+      return;
     }
-  }, [spatialAudio, activateWebAudio, addToast]);
+    const next = CROSSFEED_ORDER[(CROSSFEED_ORDER.indexOf(crossfeedRefMode.current) + 1) % CROSSFEED_ORDER.length];
+    const topologyChanges = (crossfeedRefMode.current === 'off') !== (next === 'off');
+    crossfeedRefMode.current = next;
+    setCrossfeedModeState(next);
+    saveCrossfeedMode(next);
+    applyCrossfeedParams(next);
+    if (topologyChanges) duckThroughRebuild();
+    addToast(`耳机交叉馈送：${CROSSFEED_LABELS[next]}`, next === 'off' ? 'info' : 'success');
+  }, [applyCrossfeedParams, duckThroughRebuild, addToast]);
 
-  // Rebuild audio routing when playback starts or EQ/spatial state changes
-  useEffect(() => {
-    if (!isPlaying) return;
-    const needWebAudio = spatialAudio || equalizer.filtersRef.current.length > 0;
-    if (needWebAudio || webAudioActiveRef.current) {
-      activateWebAudio(spatialAudio);
+  const toggleDeEsser = useCallback(() => {
+    const next = !deEsserModeRef.current;
+    deEsserModeRef.current = next;
+    setDeEsserState(next);
+    saveDeEsser(next);
+    duckThroughRebuild();
+    addToast(next ? '齿音抑制 已开启' : '齿音抑制 已关闭', next ? 'success' : 'info');
+  }, [duckThroughRebuild, addToast]);
+
+  const toggleLoudnessComp = useCallback(() => {
+    const next = !loudnessCompRef.current;
+    loudnessCompRef.current = next;
+    setLoudnessCompState(next);
+    saveLoudnessComp(next);
+    applyContour();
+    addToast(next ? '等响度补偿 已开启' : '等响度补偿 已关闭', next ? 'success' : 'info');
+  }, [applyContour, addToast]);
+
+  const toggleOutputMode = useCallback(() => {
+    const next: OutputMode = outputModeRef.current === 'speaker' ? 'headphone' : 'speaker';
+    outputModeRef.current = next;
+    setOutputModeState(next);
+    saveOutputMode(next);
+    if (highpassRef.current && audioCtxRef.current) {
+      highpassRef.current.frequency.setTargetAtTime(SUBSONIC_HZ[next], audioCtxRef.current.currentTime, 0.05);
     }
-  }, [isPlaying, spatialAudio, activateWebAudio, equalizer]);
+    duckThroughRebuild();
+    addToast(
+      next === 'speaker' ? '音箱外放 已开启 · Marshall 音箱曲线' : '已切回耳机模式',
+      next === 'speaker' ? 'success' : 'info',
+    );
+  }, [duckThroughRebuild, addToast]);
+
+  // Rebuild the routing only when the topology actually changes. activateWebAudio
+  // is a no-op resume when the shape of the graph is unchanged, so this can stay
+  // in an effect without touching the signal path on every render.
+  useEffect(() => {
+    if (!isPlaying && !webAudioActiveRef.current) return;
+    activateWebAudio();
+  }, [isPlaying, outputMode, crossfeedMode, deEsser, activateWebAudio]);
 
   const preloadNext = useCallback(() => {
     if (queue.length === 0) return;
@@ -532,7 +942,7 @@ export function usePlayer(
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
     navigator.mediaSession.setActionHandler('play', () => audioRef.current?.play().catch(() => {}));
-    navigator.mediaSession.setActionHandler('pause', () => audioRef.current?.pause());
+    navigator.mediaSession.setActionHandler('pause', () => mediaActionsRef.current.pause());
     navigator.mediaSession.setActionHandler('previoustrack', () => mediaActionsRef.current.prev());
     navigator.mediaSession.setActionHandler('nexttrack', () => mediaActionsRef.current.next());
     navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -559,7 +969,10 @@ export function usePlayer(
     duration,
     volume,
     playMode,
-    spatialAudio,
+    crossfeedMode,
+    deEsser,
+    loudnessComp,
+    outputMode,
     gainMultiplier,
     queue,
     queueIndex,
@@ -570,7 +983,10 @@ export function usePlayer(
     setVolume,
     setPlayMode,
     setGainMultiplier,
-    toggleSpatialAudio,
+    cycleCrossfeed,
+    toggleDeEsser,
+    toggleLoudnessComp,
+    toggleOutputMode,
     playNext,
     playPrev,
     addToQueue,
