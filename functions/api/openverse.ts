@@ -44,23 +44,15 @@ export const onRequestGet: PagesFunction = async (context) => {
   if (action === 'search') {
     const keyword = requestUrl.searchParams.get('keyword')?.trim() || '';
     const page = Math.max(1, Number.parseInt(requestUrl.searchParams.get('page') || '1', 10));
-    const limit = Math.min(60, Math.max(1, Number.parseInt(requestUrl.searchParams.get('limit') || '12', 10)));
+    const limit = Math.min(ANONYMOUS_PAGE_SIZE, Math.max(1, Number.parseInt(requestUrl.searchParams.get('limit') || '12', 10)));
     if (!keyword) return jsonResponse({ code: 1, data: [] });
 
-    // Openverse caps anonymous callers at 20 records per request.  Fetch the
-    // required pages here so the app can still expose the shared 60-item limit.
-    const pageCount = Math.ceil(limit / ANONYMOUS_PAGE_SIZE);
-    const firstUpstreamPage = (page - 1) * pageCount + 1;
-    const responses = await Promise.all(Array.from({ length: pageCount }, (_, index) => {
-      const query = new URLSearchParams({
-        q: keyword,
-        page: String(firstUpstreamPage + index),
-        page_size: String(ANONYMOUS_PAGE_SIZE),
-      });
-      return openverseFetch(`?${query.toString()}`);
-    }));
-    const results = responses.flatMap((result) => Array.isArray(result?.results) ? result.results : []);
-    if (!results.length && responses.every((result) => result === null)) {
+    // Anonymous callers may request at most 20 tracks. One upstream request
+    // per user search keeps this source below its rate-limit threshold.
+    const query = new URLSearchParams({ q: keyword, page: String(page), page_size: String(limit) });
+    const result = await openverseFetch(`?${query.toString()}`);
+    const results = Array.isArray(result?.results) ? result.results : [];
+    if (!results.length && result === null) {
       return jsonResponse({ code: 0, data: [], msg: 'Openverse search failed' });
     }
     const data = results
