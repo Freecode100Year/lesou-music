@@ -119,6 +119,7 @@ export function usePlayer(
     next: () => {}, prev: () => {}, pause: () => {},
   });
   const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playRequestRef = useRef(0);
 
   const crossfeedRef = useRef<{
     splitter: ChannelSplitterNode;
@@ -734,6 +735,7 @@ export function usePlayer(
   }, []);
 
   const playSong = useCallback(async (song: Song, newQueue?: Song[], index?: number) => {
+    const requestId = ++playRequestRef.current;
     setLoading(true);
     setCurrentSong(song);
     setSongDetail(null);
@@ -750,6 +752,7 @@ export function usePlayer(
     }
 
     const url = await fetchSongUrl(song);
+    if (requestId !== playRequestRef.current) return;
     if (!url) {
       addToast('无法获取播放地址', 'error');
       fadeEnv(1, 30);
