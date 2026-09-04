@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Page, UserInfo } from '../types';
+import { Page } from '../types';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
@@ -10,13 +10,9 @@ interface LayoutProps {
   onSearchFocus: () => void;
   gainMultiplier: number;
   onSetGainMultiplier: (v: number) => void;
-  user: UserInfo | null;
-  onLogin: (username: string, password: string) => boolean;
-  onRegister: (username: string, password: string) => boolean;
-  onLogout: () => void;
 }
 
-export function Layout({ currentPage, setPage, children, onSearchFocus, gainMultiplier, onSetGainMultiplier, user, onLogin, onRegister, onLogout }: LayoutProps) {
+export function Layout({ currentPage, setPage, children, onSearchFocus, gainMultiplier, onSetGainMultiplier }: LayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -26,10 +22,6 @@ export function Layout({ currentPage, setPage, children, onSearchFocus, gainMult
         setPage={setPage}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
-        user={user}
-        onLogin={onLogin}
-        onRegister={onRegister}
-        onLogout={onLogout}
       />
       <main className="main-content">
         <TopBar

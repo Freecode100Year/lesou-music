@@ -1,107 +1,13 @@
-import React, { useState } from 'react';
-import { Page, UserInfo } from '../types';
-
-const ALPHANUMERIC = /^[a-zA-Z0-9]+$/;
+import { Page } from '../types';
 
 interface SidebarProps {
   currentPage: Page;
   setPage: (page: Page) => void;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
-  user: UserInfo | null;
-  onLogin: (username: string, password: string) => boolean;
-  onRegister: (username: string, password: string) => boolean;
-  onLogout: () => void;
 }
 
-function SidebarAuthForm({ onLogin, onRegister }: {
-  onLogin: (username: string, password: string) => boolean;
-  onRegister: (username: string, password: string) => boolean;
-}) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const validate = (): string => {
-    if (!username) return '请输入用户名';
-    if (!ALPHANUMERIC.test(username)) return '用户名仅支持英文字母和数字';
-    if (username.length < 2) return '用户名至少 2 个字符';
-    if (!password) return '请输入密码';
-    if (!ALPHANUMERIC.test(password)) return '密码仅支持英文字母和数字';
-    if (password.length < 4) return '密码至少 4 个字符';
-    return '';
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const err = validate();
-    if (err) { setError(err); return; }
-    setError('');
-    const ok = mode === 'register'
-      ? onRegister(username, password)
-      : onLogin(username, password);
-    if (ok) {
-      setUsername('');
-      setPassword('');
-    }
-  };
-
-  const handleUsernameChange = (v: string) => {
-    setUsername(v);
-    if (error) setError('');
-  };
-
-  const handlePasswordChange = (v: string) => {
-    setPassword(v);
-    if (error) setError('');
-  };
-
-  return (
-    <form className="sidebar-auth-form" onSubmit={handleSubmit}>
-      <div className="sidebar-auth-tabs">
-        <button
-          type="button"
-          className={`sidebar-auth-tab ${mode === 'login' ? 'active' : ''}`}
-          onClick={() => { setMode('login'); setError(''); }}
-        >
-          登录
-        </button>
-        <button
-          type="button"
-          className={`sidebar-auth-tab ${mode === 'register' ? 'active' : ''}`}
-          onClick={() => { setMode('register'); setError(''); }}
-        >
-          注册
-        </button>
-      </div>
-      <input
-        type="text"
-        className="sidebar-auth-input"
-        placeholder="用户名（字母/数字）"
-        value={username}
-        onChange={(e) => handleUsernameChange(e.target.value)}
-        maxLength={20}
-        autoComplete="username"
-      />
-      <input
-        type="password"
-        className="sidebar-auth-input"
-        placeholder="密码（字母/数字）"
-        value={password}
-        onChange={(e) => handlePasswordChange(e.target.value)}
-        maxLength={20}
-        autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-      />
-      {error && <div className="sidebar-auth-error">{error}</div>}
-      <button type="submit" className="sidebar-auth-submit">
-        {mode === 'register' ? '注册' : '登录'}
-      </button>
-    </form>
-  );
-}
-
-export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen, user, onLogin, onRegister, onLogout }: SidebarProps) {
+export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen }: SidebarProps) {
   const navigate = (page: Page) => {
     setPage(page);
     setMobileOpen(false);
@@ -154,28 +60,6 @@ export function Sidebar({ currentPage, setPage, mobileOpen, setMobileOpen, user,
             <span>我的收藏</span>
           </button>
         </nav>
-
-        <div className="sidebar-footer">
-          {user ? (
-            <div className="sidebar-user">
-              <div className="sidebar-user-info">
-                <div className="sidebar-user-avatar">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                  </svg>
-                </div>
-                <span className="sidebar-user-name">{user.username}</span>
-              </div>
-              <button className="sidebar-logout-btn" onClick={onLogout} title="退出登录">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                  <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <SidebarAuthForm onLogin={onLogin} onRegister={onRegister} />
-          )}
-        </div>
       </aside>
     </>
   );
