@@ -43,7 +43,7 @@ export const onRequestGet: PagesFunction = async (context) => {
   if (action === 'search') {
     const keyword = requestUrl.searchParams.get('keyword')?.trim() || '';
     const page = Math.max(1, Number.parseInt(requestUrl.searchParams.get('page') || '1', 10));
-    const limit = Math.min(30, Math.max(1, Number.parseInt(requestUrl.searchParams.get('limit') || '12', 10)));
+    const limit = Math.min(60, Math.max(1, Number.parseInt(requestUrl.searchParams.get('limit') || '12', 10)));
     if (!keyword) return jsonResponse({ code: 1, data: [] });
 
     const query = new URLSearchParams({ q: keyword, page: String(page), page_size: String(limit) });
