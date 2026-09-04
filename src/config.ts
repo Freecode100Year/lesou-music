@@ -24,9 +24,7 @@ export const CACHE_TTL = {
 
 export const SEARCH_DEBOUNCE_MS = 300;
 export const SEARCH_HISTORY_MAX = 10;
-// Keep a full first page of results. Individual sources can still return fewer
-// when the query genuinely has fewer playable matches.
-export const DEFAULT_LIMIT = 30;
+export const DEFAULT_LIMIT = 12;
 
 export const HOT_ARTISTS = [
   '周杰伦', '林俊杰', '陈奕迅', '邓紫棋', '薛之谦',
