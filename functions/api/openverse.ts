@@ -26,9 +26,9 @@ async function openverseFetch(path: string): Promise<any | null> {
     const response = await fetch(`${OPENVERSE}${path}`, {
       headers: { 'User-Agent': 'lesou-music/1.0 (public CC music player)' },
     });
-    return response.ok ? await response.json() : { __error: response.status };
+    return response.ok ? await response.json() : null;
   } catch {
-    return { __error: 'network' };
+    return null;
   }
 }
 
@@ -60,8 +60,8 @@ export const onRequestGet: PagesFunction = async (context) => {
       return openverseFetch(`?${query.toString()}`);
     }));
     const results = responses.flatMap((result) => Array.isArray(result?.results) ? result.results : []);
-    if (!results.length && responses.every((result) => result?.__error)) {
-      return jsonResponse({ code: 0, data: [], msg: `Openverse search failed (${responses.map((result) => result.__error).join(', ')})` });
+    if (!results.length && responses.every((result) => result === null)) {
+      return jsonResponse({ code: 0, data: [], msg: 'Openverse search failed' });
     }
     const data = results
       .filter((item: any) => UUID.test(String(item?.id || '')) && item?.url)
