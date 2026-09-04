@@ -33,6 +33,11 @@ export interface SearchResult {
   page: number;
 }
 
+export interface UserInfo {
+  username: string;
+  avatar?: string;
+}
+
 export type PlayMode = 'sequential' | 'repeat-one' | 'shuffle';
 
 export type Page = 'home' | 'search' | 'starred';

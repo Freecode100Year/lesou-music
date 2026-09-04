@@ -1,7 +1,9 @@
-import { Song } from '../types';
+import { Song, UserInfo } from '../types';
 import { SEARCH_HISTORY_MAX } from '../config';
 
 const KEYS = {
+  USER: 'xql_user',
+  ACCOUNTS: 'xql_accounts',
   STARRED: 'xql_starred',
   SEARCH_HISTORY: 'xql_search_history',
   VOLUME: 'xql_volume',
@@ -17,9 +19,49 @@ const KEYS = {
   EQ_PRESET: 'xql_eq_preset',
 } as const;
 
-export function clearLegacyAuthData(): void {
-  localStorage.removeItem('xql_user');
-  localStorage.removeItem('xql_accounts');
+export function getUser(): UserInfo | null {
+  const raw = localStorage.getItem(KEYS.USER);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function setUser(user: UserInfo | null): void {
+  if (user) {
+    localStorage.setItem(KEYS.USER, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(KEYS.USER);
+  }
+}
+
+function getAccounts(): Record<string, string> {
+  const raw = localStorage.getItem(KEYS.ACCOUNTS);
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+export function registerAccount(username: string, password: string): boolean {
+  const accounts = getAccounts();
+  if (accounts[username]) return false;
+  accounts[username] = password;
+  localStorage.setItem(KEYS.ACCOUNTS, JSON.stringify(accounts));
+  return true;
+}
+
+export function authenticateAccount(username: string, password: string): boolean {
+  const accounts = getAccounts();
+  return accounts[username] === password;
+}
+
+export function accountExists(username: string): boolean {
+  return username in getAccounts();
 }
 
 export function getStarred(): Song[] {
