@@ -77,6 +77,31 @@ const MARSHALL_TRIM = Math.pow(10, -5 / 20);
 // eat headroom; a speaker cannot reproduce it at all and just distorts trying.
 const SUBSONIC_HZ = { headphone: 20, speaker: 55 };
 
+// iOS/iPadOS suspends an AudioContext when Safari is backgrounded or the screen
+// is locked. Once a media element is connected to a MediaElementAudioSourceNode,
+// its native output is muted in favour of that context, so the stream can no
+// longer keep playing. Android browsers are more permissive, but using the
+// native media path there too gives the most consistent lock-screen behaviour.
+// Keep the rich Web Audio chain for desktops and let phones/tablets use the
+// HTMLMediaElement's system-integrated output instead.
+const needsNativeBackgroundAudio = () => {
+  const ua = navigator.userAgent;
+  const isIPadDesktopUA = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  return /Android|iPhone|iPad|iPod/i.test(ua) || isIPadDesktopUA;
+};
+
+const setMediaSessionAction = (
+  action: MediaSessionAction,
+  handler: MediaSessionActionHandler,
+) => {
+  try {
+    navigator.mediaSession.setActionHandler(action, handler);
+  } catch {
+    // Each browser exposes a different subset of Media Session actions. One
+    // unsupported action must not prevent the remaining lock-screen controls.
+  }
+};
+
 export function usePlayer(
   addToast: (text: string, type?: 'success' | 'error' | 'info') => void,
   equalizer: EqualizerBridge,
@@ -455,6 +480,11 @@ export function usePlayer(
   const activateWebAudio = useCallback(() => {
     if (!audioRef.current) return;
 
+    // Do not connect a mobile media element to AudioContext. See
+    // needsNativeBackgroundAudio: a native element can continue through a
+    // phone/tablet lock screen, whereas Web Audio is commonly suspended.
+    if (needsNativeBackgroundAudio()) return;
+
     let ctx = audioCtxRef.current;
     if (!ctx) {
       // A playback latency hint buys bigger render quanta, which is what keeps a
@@ -615,6 +645,7 @@ export function usePlayer(
       audioRef.current = new Audio();
       audioRef.current.crossOrigin = 'anonymous';
       audioRef.current.preload = 'auto';
+      audioRef.current.setAttribute('playsinline', '');
       audioRef.current.volume = volumeRef.current * volumeRef.current;
     }
     const audio = audioRef.current;
@@ -943,11 +974,21 @@ export function usePlayer(
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
-    navigator.mediaSession.setActionHandler('play', () => audioRef.current?.play().catch(() => {}));
-    navigator.mediaSession.setActionHandler('pause', () => mediaActionsRef.current.pause());
-    navigator.mediaSession.setActionHandler('previoustrack', () => mediaActionsRef.current.prev());
-    navigator.mediaSession.setActionHandler('nexttrack', () => mediaActionsRef.current.next());
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
+
+    setMediaSessionAction('play', () => audioRef.current?.play().catch(() => {}));
+    setMediaSessionAction('pause', () => mediaActionsRef.current.pause());
+    setMediaSessionAction('previoustrack', () => mediaActionsRef.current.prev());
+    setMediaSessionAction('nexttrack', () => mediaActionsRef.current.next());
+    setMediaSessionAction('seekbackward', (details) => {
+      if (!audioRef.current) return;
+      audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - (details.seekOffset || 15));
+    });
+    setMediaSessionAction('seekforward', (details) => {
+      if (!audioRef.current) return;
+      const duration = Number.isFinite(audioRef.current.duration) ? audioRef.current.duration : Infinity;
+      audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + (details.seekOffset || 15));
+    });
+    setMediaSessionAction('seekto', (details) => {
       if (audioRef.current && details.seekTime != null) {
         audioRef.current.currentTime = details.seekTime;
       }
@@ -955,13 +996,40 @@ export function usePlayer(
   }, []);
 
   useEffect(() => {
-    if (!('mediaSession' in navigator) || !currentSong) return;
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !currentSong || !('MediaMetadata' in window)) return;
+
+    const artworkUrl = currentSong.pic?.startsWith('http') ? currentSong.pic : undefined;
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.name,
       artist: currentSong.artist,
       album: currentSong.album || '',
+      artwork: artworkUrl ? [
+        { src: artworkUrl, sizes: '96x96' },
+        { src: artworkUrl, sizes: '128x128' },
+        { src: artworkUrl, sizes: '192x192' },
+        { src: artworkUrl, sizes: '256x256' },
+        { src: artworkUrl, sizes: '384x384' },
+        { src: artworkUrl, sizes: '512x512' },
+      ] : [],
     });
   }, [currentSong]);
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !Number.isFinite(duration) || duration <= 0) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        position: Math.min(Math.max(currentTime, 0), duration),
+      });
+    } catch {
+      // Position state is optional and absent in older Safari versions.
+    }
+  }, [currentTime, duration]);
 
   return {
     currentSong,
