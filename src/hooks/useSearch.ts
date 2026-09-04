@@ -61,6 +61,50 @@ async function searchAudius(
   return [];
 }
 
+async function searchCcMixter(
+  kw: string,
+  pg: number,
+  signal: AbortSignal,
+): Promise<Song[]> {
+  const url = `${API.CCMIXTER}?action=search&keyword=${encodeURIComponent(kw)}&page=${pg}&limit=${DEFAULT_LIMIT}`;
+  const res = await fetch(url, { signal });
+  const data = await res.json();
+  if (data.code === 1 && Array.isArray(data.data)) {
+    return data.data.map((item: any) => ({
+      id: String(item.id),
+      name: item.name || '',
+      artist: item.artist || '',
+      album: item.license || 'Creative Commons',
+      pic: item.pic,
+      source: 'cc' as const,
+      sourceType: 'ccmixter' as const,
+    }));
+  }
+  return [];
+}
+
+async function searchArchive(
+  kw: string,
+  pg: number,
+  signal: AbortSignal,
+): Promise<Song[]> {
+  const url = `${API.ARCHIVE}?action=search&keyword=${encodeURIComponent(kw)}&page=${pg}&limit=${DEFAULT_LIMIT}`;
+  const res = await fetch(url, { signal });
+  const data = await res.json();
+  if (data.code === 1 && Array.isArray(data.data)) {
+    return data.data.map((item: any) => ({
+      id: String(item.id),
+      name: item.name || '',
+      artist: item.artist || 'Internet Archive',
+      album: item.license || 'Creative Commons',
+      pic: item.pic,
+      source: 'ia' as const,
+      sourceType: 'archive' as const,
+    }));
+  }
+  return [];
+}
+
 async function searchAggregate(
   kw: string,
   pg: number,
@@ -70,6 +114,8 @@ async function searchAggregate(
     searchStandard(kw, 'wy', pg, signal).catch(() => [] as Song[]),
     searchStandard(kw, 'jx', pg, signal).catch(() => [] as Song[]),
     searchAudius(kw, pg, signal).catch(() => [] as Song[]),
+    searchCcMixter(kw, pg, signal).catch(() => [] as Song[]),
+    searchArchive(kw, pg, signal).catch(() => [] as Song[]),
   ];
   const results = await Promise.all(searches);
   const merged: Song[] = [];
@@ -131,6 +177,10 @@ export function useSearch() {
           songs = await searchAggregate(kw, pg, abortRef.current.signal);
         } else if (platformInfo.type === 'audius') {
           songs = await searchAudius(kw, pg, abortRef.current.signal);
+        } else if (platformInfo.type === 'ccmixter') {
+          songs = await searchCcMixter(kw, pg, abortRef.current.signal);
+        } else if (platformInfo.type === 'archive') {
+          songs = await searchArchive(kw, pg, abortRef.current.signal);
         } else {
           songs = await searchStandard(kw, plat, pg, abortRef.current.signal);
         }

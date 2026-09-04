@@ -2,6 +2,8 @@ const ALLOWED_DOMAINS = [
   'music.126.net',
   'joox.com',
   'audius.co',
+  'ccmixter.org',
+  'archive.org',
   'injahow.cn',
 ];
 

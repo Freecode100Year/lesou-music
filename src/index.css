@@ -571,6 +571,16 @@ a {
   color: #b07ae8;
 }
 
+.source-badge-cc {
+  background: rgba(39, 174, 96, 0.15);
+  color: #31b66a;
+}
+
+.source-badge-ia {
+  background: rgba(231, 126, 34, 0.15);
+  color: #e8953d;
+}
+
 .source-badge-all {
   background: rgba(33, 150, 243, 0.15);
   color: #2196f3;

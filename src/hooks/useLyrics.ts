@@ -20,7 +20,7 @@ export function useLyrics(currentSong: Song | null, currentTime: number) {
 
     try {
       let lrc = '';
-      if (song.sourceType === 'audius') {
+      if (song.sourceType === 'audius' || song.sourceType === 'ccmixter' || song.sourceType === 'archive') {
         lrc = '';
       } else if (song.sourceType === 'gd') {
         const res = await fetch(`${API.GD}?types=lyric&source=${song.source}&id=${song.id}`);

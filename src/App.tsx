@@ -76,6 +76,18 @@ export default function App() {
           if (data.code === 1 && data.data) {
             url = data.data.url || '';
           }
+        } else if (song.sourceType === 'ccmixter') {
+          const res = await fetch(`${API.CCMIXTER}?action=song&id=${encodeURIComponent(song.id)}`);
+          const data = await res.json();
+          if (data.code === 1 && data.data) {
+            url = data.data.url || '';
+          }
+        } else if (song.sourceType === 'archive') {
+          const res = await fetch(`${API.ARCHIVE}?action=song&id=${encodeURIComponent(song.id)}`);
+          const data = await res.json();
+          if (data.code === 1 && data.data) {
+            url = data.data.url || '';
+          }
         } else if (song.sourceType === 'gd') {
           const res = await fetch(`${API.GD}?types=url&source=${song.source}&id=${song.id}&br=320`);
           const data = await res.json();

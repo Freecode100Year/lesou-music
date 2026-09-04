@@ -23,6 +23,8 @@
 ---
 
 ### 🎵 音源更新迭代
+- **新增 ccMixter 与 Internet Archive Netlabels**：接入两条无需密钥的公开音乐源。ccMixter 逐首保留 Creative Commons 许可；Internet Archive 仅展示 Netlabels 集合中带 CC 许可、且可公开访问的音频条目。
+- **音源审计**：Audius 已存在，未重复接入；Jamendo、FMA、Musopen、Freesound 等需要应用密钥或账号；MusicBrainz、AcoustID、LRCLIB 和 Lyrics.ovh 是元数据/歌词服务而非播放源；LX Music、Spotube、music-dl 是客户端工具，未作为第三方解析源嵌入。
 - **新增 JOOX 音源**：搜索 / 播放 / 歌词 / 封面全链路可用，作为酷我失效后的主力替代源。
 - **新增 Audius 音源**：接入去中心化音乐平台 Audius 公开 API（无需 key、全球可访问），以欧美 lofi / 电子 / 嘻哈 / 独立音乐为主，与华语源互补。已过滤 `is_streamable: false` 与门控曲目，避免点播 404。
 - **修复酷我播放失效**：上游 `types=url&source=kuwo` 已废，改为服务端跨源兜底——按歌名 + 歌手重新到 netease / joox 匹配取真实播放地址。
@@ -42,7 +44,7 @@
 ## 功能特性
 
 ### 音乐播放
-- 多平台聚合搜索（网易云 / JOOX / Audius / 全网聚合）
+- 多平台聚合搜索（网易云 / JOOX / Audius / ccMixter / Internet Archive CC / 全网聚合）
 - 歌词同步显示（支持 LRC 逐行高亮）
 - 播放模式切换（顺序播放 / 随机播放 / 单曲循环）
 - 播放队列管理（添加、移除、清空）
@@ -114,6 +116,8 @@ functions/api/        # Cloudflare Pages Functions（服务端代理）
 ├── song.ts               # 歌曲详情/URL/歌词代理
 ├── gd.ts                 # 聚合源代理
 ├── audius.ts             # Audius 源代理（搜索 / 详情）
+├── ccmixter.ts           # ccMixter CC 音乐源（搜索 / 详情）
+├── archive.ts            # Internet Archive Netlabels CC 音乐源（搜索 / 详情）
 ├── youtube-search.ts     # YouTube (Invidious) 搜索代理
 └── audio-proxy.ts        # 音频流 CORS 代理
 ```

@@ -3,6 +3,8 @@ export const API = {
   SONG: '/api/song',
   GD: '/api/gd',
   AUDIUS: '/api/audius',
+  CCMIXTER: '/api/ccmixter',
+  ARCHIVE: '/api/archive',
   AUDIO_PROXY: '/api/audio-proxy',
 } as const;
 
@@ -13,6 +15,8 @@ export const PLATFORMS = [
   { key: 'wy', label: '网易云', type: 'standard' as const },
   { key: 'jx', label: 'JOOX', type: 'standard' as const },
   { key: 'au', label: 'Audius', type: 'audius' as const },
+  { key: 'cc', label: 'ccMixter', type: 'ccmixter' as const },
+  { key: 'ia', label: '互联网档案馆', type: 'archive' as const },
 ] as const;
 
 export const CACHE_TTL = {

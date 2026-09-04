@@ -7,6 +7,8 @@ const SOURCE_LABELS: Record<string, string> = {
   wy: '网易云',
   jx: 'JOOX',
   au: 'Audius',
+  cc: 'ccMixter',
+  ia: '档案馆 CC',
   netease: '网易云',
   joox: 'JOOX',
   all: '全网',
