@@ -3,7 +3,7 @@ import { Page, Song, ToastMessage } from './types';
 import { generateId } from './utils/format';
 import { usePlayer } from './hooks/usePlayer';
 import { useSearch } from './hooks/useSearch';
-import { useUser } from './hooks/useUser';
+import { useFavorites } from './hooks/useFavorites';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useLyrics } from './hooks/useLyrics';
 import { useEqualizer } from './hooks/useEqualizer';
@@ -46,7 +46,7 @@ export default function App() {
   );
   const player = usePlayer(addToast, eqBridge);
   const searchHook = useSearch();
-  const userHook = useUser(addToast);
+  const favorites = useFavorites(addToast);
 
   const { lyrics, currentLineIndex } = useLyrics(player.currentSong, player.currentTime);
 
@@ -107,17 +107,17 @@ export default function App() {
   }, [addToast]);
 
   const handlePlayAllStarred = useCallback(() => {
-    if (userHook.starred.length === 0) return;
+    if (favorites.starred.length === 0) return;
     player.setPlayMode('sequential');
-    player.playSong(userHook.starred[0], userHook.starred, 0);
-  }, [userHook.starred, player.playSong, player.setPlayMode]);
+    player.playSong(favorites.starred[0], favorites.starred, 0);
+  }, [favorites.starred, player.playSong, player.setPlayMode]);
 
   const handleShuffleAllStarred = useCallback(() => {
-    if (userHook.starred.length === 0) return;
+    if (favorites.starred.length === 0) return;
     player.setPlayMode('shuffle');
-    const idx = Math.floor(Math.random() * userHook.starred.length);
-    player.playSong(userHook.starred[idx], userHook.starred, idx);
-  }, [userHook.starred, player.playSong, player.setPlayMode]);
+    const idx = Math.floor(Math.random() * favorites.starred.length);
+    player.playSong(favorites.starred[idx], favorites.starred, idx);
+  }, [favorites.starred, player.playSong, player.setPlayMode]);
 
   const handleSearchFocus = useCallback(() => {
     setCurrentPage('search');
@@ -149,17 +149,13 @@ export default function App() {
         onSearchFocus={handleSearchFocus}
         gainMultiplier={player.gainMultiplier}
         onSetGainMultiplier={player.setGainMultiplier}
-        user={userHook.user}
-        onLogin={userHook.login}
-        onRegister={userHook.register}
-        onLogout={userHook.logout}
       >
         {currentPage === 'home' && (
           <HomePage
             currentSong={player.currentSong}
-            isStarred={userHook.isStarred}
+            isStarred={favorites.isStarred}
             onPlay={playSongInList}
-            onStar={userHook.toggleStar}
+            onStar={favorites.toggleStar}
             onAddToQueue={(song) => player.addToQueue([song])}
             onDownload={handleDownload}
           />
@@ -177,9 +173,9 @@ export default function App() {
             changePlatform={searchHook.changePlatform}
             setKeyword={searchHook.setKeyword}
             currentSong={player.currentSong}
-            isStarred={userHook.isStarred}
+            isStarred={favorites.isStarred}
             onPlay={(song, index) => playSongInList(song, searchHook.results, index)}
-            onStar={userHook.toggleStar}
+            onStar={favorites.toggleStar}
             onAddToQueue={(song) => player.addToQueue([song])}
             onDownload={handleDownload}
             playSongInList={playSongInList}
@@ -188,11 +184,11 @@ export default function App() {
         )}
         {currentPage === 'starred' && (
           <StarredPage
-            starred={userHook.starred}
+            starred={favorites.starred}
             currentSong={player.currentSong}
-            isStarred={userHook.isStarred}
+            isStarred={favorites.isStarred}
             onPlay={playSongInList}
-            onStar={userHook.toggleStar}
+            onStar={favorites.toggleStar}
             onAddToQueue={(song) => player.addToQueue([song])}
             onDownload={handleDownload}
             onPlayAll={handlePlayAllStarred}
