@@ -8,11 +8,9 @@ interface LayoutProps {
   setPage: (page: Page) => void;
   children: React.ReactNode;
   onSearchFocus: () => void;
-  gainMultiplier: number;
-  onSetGainMultiplier: (v: number) => void;
 }
 
-export function Layout({ currentPage, setPage, children, onSearchFocus, gainMultiplier, onSetGainMultiplier }: LayoutProps) {
+export function Layout({ currentPage, setPage, children, onSearchFocus }: LayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -28,8 +26,6 @@ export function Layout({ currentPage, setPage, children, onSearchFocus, gainMult
           currentPage={currentPage}
           onMenuClick={() => setMobileOpen(true)}
           onSearchFocus={onSearchFocus}
-          gainMultiplier={gainMultiplier}
-          onSetGainMultiplier={onSetGainMultiplier}
         />
         <div className="page-content">
           {children}

@@ -155,8 +155,6 @@ export default function App() {
         currentPage={currentPage}
         setPage={setCurrentPage}
         onSearchFocus={handleSearchFocus}
-        gainMultiplier={player.gainMultiplier}
-        onSetGainMultiplier={player.setGainMultiplier}
       >
         {currentPage === 'home' && (
           <HomePage
@@ -211,6 +209,8 @@ export default function App() {
         onShowQueue={() => setShowQueue(true)}
         onShowEqualizer={() => setShowEqualizer(true)}
         eqEnabled={eq.enabled}
+        gainMultiplier={player.gainMultiplier}
+        onSetGainMultiplier={player.setGainMultiplier}
       />
 
       <LyricsOverlay

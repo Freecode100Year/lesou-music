@@ -28,6 +28,8 @@ interface PlayerProps {
   onShowQueue: () => void;
   onShowEqualizer: () => void;
   eqEnabled: boolean;
+  gainMultiplier: number;
+  onSetGainMultiplier: (value: number) => void;
 }
 
 export function Player({
@@ -52,9 +54,12 @@ export function Player({
   onShowQueue,
   onShowEqualizer,
   eqEnabled,
+  gainMultiplier,
+  onSetGainMultiplier,
 }: PlayerProps) {
   const [coverUrl, setCoverUrl] = useState('');
   const [showVolume, setShowVolume] = useState(false);
+  const [showBoost, setShowBoost] = useState(false);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverPos, setHoverPos] = useState(0);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -173,6 +178,34 @@ export function Player({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      <div className="player-boost-wrap">
+        <button
+          className={`player-boost-btn ${gainMultiplier > 1 ? 'boosted' : ''}`}
+          onClick={() => setShowBoost((show) => !show)}
+          aria-expanded={showBoost}
+          title="音量增强，最高 3 倍"
+        >
+          {gainMultiplier.toFixed(1)}x
+        </button>
+        {showBoost && (
+          <div className="player-boost-popup">
+            <div className="player-boost-label">
+              <span>音量增强</span>
+              <span className="player-boost-value">{gainMultiplier.toFixed(1)}x</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="3"
+              step="0.1"
+              value={gainMultiplier}
+              onChange={(e) => onSetGainMultiplier(parseFloat(e.target.value))}
+              className="player-boost-slider"
+              aria-label="音量增强倍数"
+            />
+          </div>
+        )}
+      </div>
       <div
         className="player-progress"
         ref={progressRef}
