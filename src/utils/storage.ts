@@ -1,8 +1,6 @@
-import { Song } from '../types';
 import { SEARCH_HISTORY_MAX } from '../config';
 
 const KEYS = {
-  STARRED: 'xql_starred',
   SEARCH_HISTORY: 'xql_search_history',
   VOLUME: 'xql_volume',
   PLAY_MODE: 'xql_play_mode',
@@ -20,20 +18,6 @@ const KEYS = {
 export function clearLegacyAuthData(): void {
   localStorage.removeItem('xql_user');
   localStorage.removeItem('xql_accounts');
-}
-
-export function getStarred(): Song[] {
-  const raw = localStorage.getItem(KEYS.STARRED);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-export function setStarred(songs: Song[]): void {
-  localStorage.setItem(KEYS.STARRED, JSON.stringify(songs));
 }
 
 export function getSearchHistory(): string[] {

@@ -5,9 +5,7 @@ import { SongRow } from './SongRow';
 interface SongListProps {
   songs: Song[];
   currentSong: Song | null;
-  isStarred: (song: Song) => boolean;
   onPlay: (song: Song, index: number) => void;
-  onStar: (song: Song) => void;
   onAddToQueue: (song: Song) => void;
   onDownload: (song: Song) => void;
   loading?: boolean;
@@ -21,9 +19,7 @@ const OVERSCAN = 5;
 export function SongList({
   songs,
   currentSong,
-  isStarred,
   onPlay,
-  onStar,
   onAddToQueue,
   onDownload,
   loading,
@@ -91,9 +87,7 @@ export function SongList({
             song={song}
             index={index}
             isPlaying={currentSong?.id === song.id && currentSong?.source === song.source}
-            isStarred={isStarred(song)}
             onPlay={() => onPlay(song, index)}
-            onStar={() => onStar(song)}
             onAddToQueue={() => onAddToQueue(song)}
             onDownload={() => onDownload(song)}
           />
@@ -127,9 +121,7 @@ export function SongList({
                 song={song}
                 index={realIndex}
                 isPlaying={currentSong?.id === song.id && currentSong?.source === song.source}
-                isStarred={isStarred(song)}
                 onPlay={() => onPlay(song, realIndex)}
-                onStar={() => onStar(song)}
                 onAddToQueue={() => onAddToQueue(song)}
                 onDownload={() => onDownload(song)}
               />

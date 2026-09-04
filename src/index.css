@@ -537,10 +537,6 @@ a {
   background: var(--bg-card);
 }
 
-.action-btn.starred {
-  color: var(--primary);
-}
-
 .song-row-source {
   flex-shrink: 0;
 }
@@ -692,56 +688,6 @@ a {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.6;
-}
-
-/* ==================== STARRED PAGE ==================== */
-.starred-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.starred-count {
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-.starred-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.starred-play-btn,
-.starred-shuffle-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  font-weight: 500;
-  transition: all var(--transition);
-}
-
-.starred-play-btn {
-  background: var(--primary);
-  color: white;
-}
-
-.starred-play-btn:hover {
-  background: var(--primary-hover);
-}
-
-.starred-shuffle-btn {
-  background: var(--bg-card);
-  color: var(--text-secondary);
-}
-
-.starred-shuffle-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-main);
 }
 
 /* ==================== PLAYER ==================== */

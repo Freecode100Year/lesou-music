@@ -18,9 +18,7 @@ interface SearchPageProps {
   changePlatform: (plat: string) => void;
   setKeyword: (kw: string) => void;
   currentSong: Song | null;
-  isStarred: (song: Song) => boolean;
   onPlay: (song: Song, index: number) => void;
-  onStar: (song: Song) => void;
   onAddToQueue: (song: Song) => void;
   onDownload: (song: Song) => void;
   playSongInList: (song: Song, list: Song[], index: number) => void;
@@ -40,9 +38,7 @@ export function SearchPage({
   changePlatform,
   setKeyword,
   currentSong,
-  isStarred,
   onPlay,
-  onStar,
   onAddToQueue,
   onDownload,
   playSongInList,
@@ -140,9 +136,7 @@ export function SearchPage({
       <SongList
         songs={results}
         currentSong={currentSong}
-        isStarred={isStarred}
         onPlay={(song, index) => playSongInList(song, results, index)}
-        onStar={onStar}
         onAddToQueue={onAddToQueue}
         onDownload={onDownload}
         loading={loading}

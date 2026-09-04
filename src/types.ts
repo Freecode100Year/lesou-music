@@ -37,7 +37,7 @@ export interface SearchResult {
 
 export type PlayMode = 'sequential' | 'repeat-one' | 'shuffle';
 
-export type Page = 'home' | 'search' | 'starred';
+export type Page = 'home' | 'search';
 
 export interface ToastMessage {
   id: string;

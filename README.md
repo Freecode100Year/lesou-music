@@ -60,10 +60,6 @@
 - K 计权响度均衡、感知音量曲线、切歌淡入淡出、超低频高通、削顶限制器
 - 3 倍增益调节
 
-### 本地收藏
-- 收藏歌曲（全部播放 / 随机播放）
-- 数据仅保存在当前设备（localStorage），无需注册或登录
-
 ### 界面
 - 响应式布局，支持移动端
 - 侧边栏导航
@@ -91,7 +87,6 @@ src/
 │   ├── Equalizer.tsx     # 31 段均衡器面板
 │   ├── LyricsOverlay.tsx # 歌词浮层
 │   ├── SearchPage.tsx    # 搜索页
-│   ├── StarredPage.tsx   # 收藏页
 │   ├── HomePage.tsx      # 发现音乐页
 │   ├── QueuePanel.tsx    # 播放队列
 │   ├── Sidebar.tsx       # 侧边栏导航
@@ -101,7 +96,6 @@ src/
 │   ├── useEqualizer.ts   # 均衡器状态与滤波器
 │   ├── useSearch.ts      # 搜索与分页
 │   ├── useLyrics.ts      # 歌词解析与同步
-│   ├── useFavorites.ts   # 本地收藏
 │   └── useKeyboard.ts    # 键盘快捷键
 ├── utils/            # 工具函数
 │   ├── storage.ts        # localStorage 读写

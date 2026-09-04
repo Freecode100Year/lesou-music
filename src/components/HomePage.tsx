@@ -6,14 +6,12 @@ import { SongList } from './SongList';
 
 interface HomePageProps {
   currentSong: Song | null;
-  isStarred: (song: Song) => boolean;
   onPlay: (song: Song, list: Song[], index: number) => void;
-  onStar: (song: Song) => void;
   onAddToQueue: (song: Song) => void;
   onDownload: (song: Song) => void;
 }
 
-export function HomePage({ currentSong, isStarred, onPlay, onStar, onAddToQueue, onDownload }: HomePageProps) {
+export function HomePage({ currentSong, onPlay, onAddToQueue, onDownload }: HomePageProps) {
   const [recommendations, setRecommendations] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [sectionTitle, setSectionTitle] = useState('');
@@ -72,9 +70,7 @@ export function HomePage({ currentSong, isStarred, onPlay, onStar, onAddToQueue,
       <SongList
         songs={recommendations}
         currentSong={currentSong}
-        isStarred={isStarred}
         onPlay={(song, index) => onPlay(song, recommendations, index)}
-        onStar={onStar}
         onAddToQueue={onAddToQueue}
         onDownload={onDownload}
         loading={loading}

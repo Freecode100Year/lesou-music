@@ -18,14 +18,12 @@ interface SongRowProps {
   song: Song;
   index: number;
   isPlaying: boolean;
-  isStarred: boolean;
   onPlay: () => void;
-  onStar: () => void;
   onAddToQueue: () => void;
   onDownload: () => void;
 }
 
-export const SongRow = React.memo(function SongRow({ song, index, isPlaying, isStarred, onPlay, onStar, onAddToQueue, onDownload }: SongRowProps) {
+export const SongRow = React.memo(function SongRow({ song, index, isPlaying, onPlay, onAddToQueue, onDownload }: SongRowProps) {
   const imgRef = useRef<HTMLDivElement>(null);
   const [imgSrc, setImgSrc] = useState<string>('');
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -132,15 +130,6 @@ export const SongRow = React.memo(function SongRow({ song, index, isPlaying, isS
         <span className="song-row-artist">{song.artist}{song.album ? ` - ${song.album}` : ''}</span>
       </div>
       <div className="song-row-actions" onClick={(e) => e.stopPropagation()}>
-        <button
-          className={`action-btn ${isStarred ? 'starred' : ''}`}
-          onClick={onStar}
-          title="收藏"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill={isStarred ? '#fa2d48' : 'currentColor'}>
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-          </svg>
-        </button>
         <button className="action-btn" onClick={onAddToQueue} title="添加到队列">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />

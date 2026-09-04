@@ -14,7 +14,6 @@ export function TopBar({ currentPage, onMenuClick, onSearchFocus, gainMultiplier
   const titles: Record<Page, string> = {
     home: '发现音乐',
     search: '搜索',
-    starred: '我的收藏',
   };
 
   return (
