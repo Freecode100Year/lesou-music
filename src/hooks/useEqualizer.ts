@@ -167,9 +167,11 @@ export function estimatePeakBoostDb(gains: number[]): number {
 export function useEqualizer() {
   const [gains, setGains] = useState<number[]>(() => getEqGains() || DEFAULT_GAINS);
   const [enabled, setEnabledState] = useState(() => getEqEnabled());
+  const [bypassed, setBypassedState] = useState(false);
   const [preset, setPresetState] = useState(() => getEqPreset());
   const filtersRef = useRef<BiquadFilterNode[]>([]);
   const preampRef = useRef<GainNode | null>(null);
+  const bypassRef = useRef(false);
 
   // Every house curve boosts something, and the loudest of them adds more than
   // 10 dB. Without a matching preamp cut that lands straight in the limiter and
@@ -184,7 +186,7 @@ export function useEqualizer() {
   const createFilters = useCallback((ctx: AudioContext): BiquadFilterNode[] => {
     if (filtersRef.current.length > 0) return filtersRef.current;
     const currentGains = getEqGains() || DEFAULT_GAINS;
-    const isEnabled = getEqEnabled();
+    const isEnabled = getEqEnabled() && !bypassRef.current;
     const filters = EQ_FREQUENCIES.map((freq, i) => {
       const filter = ctx.createBiquadFilter();
       filter.type = 'peaking';
@@ -218,15 +220,15 @@ export function useEqualizer() {
       const next = [...prev];
       next[index] = clamped;
       saveEqGains(next);
-      if (enabled) applyPreamp(next, true);
+      if (enabled && !bypassed) applyPreamp(next, true);
       return next;
     });
-    if (filtersRef.current[index] && enabled) {
+    if (filtersRef.current[index] && enabled && !bypassed) {
       filtersRef.current[index].gain.value = clamped;
     }
     setPresetState('custom');
     saveEqPreset('custom');
-  }, [enabled, applyPreamp]);
+  }, [enabled, bypassed, applyPreamp]);
 
   const reset = useCallback(() => {
     setGains(DEFAULT_GAINS);
@@ -234,12 +236,14 @@ export function useEqualizer() {
     setPresetState('flat');
     saveEqPreset('flat');
     filtersRef.current.forEach(f => { f.gain.value = 0; });
-    applyPreamp(DEFAULT_GAINS, enabled);
-  }, [applyPreamp, enabled]);
+    applyPreamp(DEFAULT_GAINS, enabled && !bypassed);
+  }, [applyPreamp, enabled, bypassed]);
 
   const setEnabled = useCallback((on: boolean) => {
     setEnabledState(on);
     saveEqEnabled(on);
+    bypassRef.current = false;
+    setBypassedState(false);
     const stored = getEqGains() || DEFAULT_GAINS;
     const active = on ? stored : DEFAULT_GAINS;
     filtersRef.current.forEach((f, i) => {
@@ -255,16 +259,27 @@ export function useEqualizer() {
     saveEqGains(p.gains);
     setPresetState(presetName);
     saveEqPreset(presetName);
-    if (enabled) {
+    if (enabled && !bypassed) {
       filtersRef.current.forEach((f, i) => {
         f.gain.value = p.gains[i];
       });
     }
-    applyPreamp(p.gains, enabled);
+    applyPreamp(p.gains, enabled && !bypassed);
+  }, [enabled, bypassed, applyPreamp]);
+
+  const setBypassed = useCallback((on: boolean) => {
+    bypassRef.current = on;
+    setBypassedState(on);
+    const stored = getEqGains() || DEFAULT_GAINS;
+    const active = enabled && !on;
+    filtersRef.current.forEach((filter, index) => {
+      filter.gain.value = active ? stored[index] : 0;
+    });
+    applyPreamp(stored, active);
   }, [enabled, applyPreamp]);
 
   return {
-    gains, enabled, preset, filtersRef, preampRef,
-    createFilters, createPreamp, setBandGain, reset, setEnabled, applyPreset,
+    gains, enabled, bypassed, preset, filtersRef, preampRef,
+    createFilters, createPreamp, setBandGain, reset, setEnabled, setBypassed, applyPreset,
   };
 }

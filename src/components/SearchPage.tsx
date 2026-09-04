@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Song } from '../types';
 import { PLATFORMS } from '../config';
+import { SourceStatus } from '../hooks/useSearch';
 import { getSearchHistory, clearSearchHistory } from '../utils/storage';
 import { SongList } from './SongList';
 
@@ -9,6 +10,7 @@ interface SearchPageProps {
   loading: boolean;
   keyword: string;
   platform: string;
+  sourceStatus: Record<string, SourceStatus>;
   hasMore: boolean;
   search: (kw: string, plat?: string) => void;
   searchImmediate: (kw: string, plat?: string) => void;
@@ -30,6 +32,7 @@ export function SearchPage({
   loading,
   keyword,
   platform,
+  sourceStatus,
   hasMore,
   search,
   searchImmediate,
@@ -107,6 +110,13 @@ export function SearchPage({
             onClick={() => changePlatform(p.key)}
           >
             {p.label}
+            {p.key !== 'all' && sourceStatus[p.key] && sourceStatus[p.key] !== 'idle' && (
+              <span
+                className={`source-status source-status-${sourceStatus[p.key]}`}
+                title={sourceStatus[p.key] === 'error' ? '该音源暂时不可用' : sourceStatus[p.key] === 'loading' ? '正在连接音源' : '音源连接正常'}
+                aria-label={sourceStatus[p.key] === 'error' ? '音源暂时不可用' : undefined}
+              />
+            )}
           </button>
         ))}
       </div>

@@ -120,6 +120,9 @@ export function usePlayer(
   });
   const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playRequestRef = useRef(0);
+  const failureSkipRef = useRef<() => boolean>(() => false);
+  const autoSkipInFlightRef = useRef(false);
+  const failedTrackCountRef = useRef(0);
 
   const crossfeedRef = useRef<{
     splitter: ChannelSplitterNode;
@@ -657,11 +660,16 @@ export function usePlayer(
     // Fading in from the `playing` event rather than from the play() call keeps
     // the envelope honest whichever route started playback - the transport
     // buttons, the lock screen, or the end of the previous track.
-    const onPlaying = () => { setIsPlaying(true); fadeEnv(1, 90); };
+    const onPlaying = () => {
+      failedTrackCountRef.current = 0;
+      setIsPlaying(true);
+      fadeEnv(1, 90);
+    };
     const onPause = () => setIsPlaying(false);
     const onError = () => {
-      addToast('播放失败，请尝试其他源', 'error');
       setIsPlaying(false);
+      const skipped = failureSkipRef.current();
+      addToast(skipped ? '当前歌曲不可播放，已自动跳到下一首' : '播放失败，请尝试其他源', 'error');
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
@@ -750,6 +758,9 @@ export function usePlayer(
   }, []);
 
   const playSong = useCallback(async (song: Song, newQueue?: Song[], index?: number) => {
+    const isAutomaticSkip = autoSkipInFlightRef.current;
+    autoSkipInFlightRef.current = false;
+    if (!isAutomaticSkip) failedTrackCountRef.current = 0;
     const requestId = ++playRequestRef.current;
     setLoading(true);
     setCurrentSong(song);
@@ -769,7 +780,8 @@ export function usePlayer(
     const url = await fetchSongUrl(song);
     if (requestId !== playRequestRef.current) return;
     if (!url) {
-      addToast('无法获取播放地址', 'error');
+      const skipped = failureSkipRef.current();
+      addToast(skipped ? '无法获取播放地址，已自动跳到下一首' : '无法获取播放地址', 'error');
       fadeEnv(1, 30);
       setLoading(false);
       return;
@@ -863,6 +875,22 @@ export function usePlayer(
     setQueueIndex(nextIndex);
     playSong(queue[nextIndex], queue, nextIndex);
   }, [queue, queueIndex, playMode, playSong]);
+
+  const skipFailedTrack = useCallback((): boolean => {
+    if (queue.length < 2 || failedTrackCountRef.current >= queue.length - 1) return false;
+    const start = queueIndex >= 0 ? queueIndex : 0;
+    const nextIndex = (start + 1) % queue.length;
+    if (nextIndex === start) return false;
+    failedTrackCountRef.current += 1;
+    autoSkipInFlightRef.current = true;
+    setQueueIndex(nextIndex);
+    playSong(queue[nextIndex], queue, nextIndex);
+    return true;
+  }, [queue, queueIndex, playSong]);
+
+  useEffect(() => {
+    failureSkipRef.current = skipFailedTrack;
+  }, [skipFailedTrack]);
 
   const playPrev = useCallback(() => {
     if (queue.length === 0) return;

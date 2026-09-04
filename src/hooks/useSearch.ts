@@ -4,130 +4,112 @@ import { API, CACHE_TTL, SEARCH_DEBOUNCE_MS, DEFAULT_LIMIT, PLATFORMS } from '..
 import { requestCache } from '../utils/cache';
 import { addSearchHistory } from '../utils/storage';
 
+export type SourceStatus = 'idle' | 'loading' | 'ready' | 'error';
+type SourceStatusMap = Record<string, SourceStatus>;
+type SearchResponse = { songs: Song[]; statuses: SourceStatusMap };
+
+const SOURCE_KEYS = PLATFORMS.filter((platform) => platform.key !== 'all').map((platform) => platform.key);
+const SEARCH_TIMEOUT_MS = 12_000;
+
 function deduplicateSongs(songs: Song[]): Song[] {
   const seen = new Map<string, Song>();
   for (const song of songs) {
     const key = `${song.name.toLowerCase().trim()}|${song.artist.toLowerCase().trim()}`;
-    if (!seen.has(key)) {
-      seen.set(key, song);
-    }
+    if (!seen.has(key)) seen.set(key, song);
   }
   return Array.from(seen.values());
 }
 
-async function searchStandard(
-  kw: string,
-  plat: string,
-  pg: number,
-  signal: AbortSignal,
-): Promise<Song[]> {
+function readyStatus(key: string): SourceStatusMap {
+  return { [key]: 'ready' };
+}
+
+async function searchJson(url: string, signal: AbortSignal): Promise<any> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
+  const abort = () => controller.abort();
+  signal.addEventListener('abort', abort, { once: true });
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`Search failed (${response.status})`);
+    return await response.json();
+  } finally {
+    window.clearTimeout(timeout);
+    signal.removeEventListener('abort', abort);
+  }
+}
+
+async function searchStandard(kw: string, plat: string, pg: number, signal: AbortSignal): Promise<Song[]> {
   const url = `${API.SEARCH}?keyword=${encodeURIComponent(kw)}&type=${plat}&page=${pg}&limit=${DEFAULT_LIMIT}`;
-  const res = await fetch(url, { signal });
-  const data = await res.json();
-  if (data.code === 1 && Array.isArray(data.data)) {
-    return data.data.map((item: any) => ({
-      id: String(item.id || item.ID),
-      name: item.name || item.songname || '',
-      artist: item.artist || item.singer || '',
-      album: item.album || '',
-      pic: item.pic,
-      source: plat as StandardPlatform,
-      sourceType: 'standard' as const,
-    }));
-  }
-  return [];
+  const data = await searchJson(url, signal);
+  if (data.code !== 1 || !Array.isArray(data.data)) throw new Error(`${plat} search unavailable`);
+  return data.data.map((item: any) => ({
+    id: String(item.id || item.ID),
+    name: item.name || item.songname || '',
+    artist: item.artist || item.singer || '',
+    album: item.album || '',
+    pic: item.pic,
+    source: plat as StandardPlatform,
+    sourceType: 'standard' as const,
+  }));
 }
 
-async function searchAudius(
-  kw: string,
-  pg: number,
-  signal: AbortSignal,
-): Promise<Song[]> {
+async function searchAudius(kw: string, pg: number, signal: AbortSignal): Promise<Song[]> {
   const url = `${API.AUDIUS}?action=search&keyword=${encodeURIComponent(kw)}&page=${pg}&limit=${DEFAULT_LIMIT}`;
-  const res = await fetch(url, { signal });
-  const data = await res.json();
-  if (data.code === 1 && Array.isArray(data.data)) {
-    return data.data.map((item: any) => ({
-      id: String(item.id),
-      name: item.name || '',
-      artist: item.artist || '',
-      album: item.album || '',
-      pic: item.pic,
-      duration: item.duration,
-      source: 'au' as const,
-      sourceType: 'audius' as const,
-    }));
-  }
-  return [];
+  const data = await searchJson(url, signal);
+  if (data.code !== 1 || !Array.isArray(data.data)) throw new Error('Audius search unavailable');
+  return data.data.map((item: any) => ({
+    id: String(item.id), name: item.name || '', artist: item.artist || '', album: item.album || '',
+    pic: item.pic, duration: item.duration, source: 'au' as const, sourceType: 'audius' as const,
+  }));
 }
 
-async function searchCcMixter(
-  kw: string,
-  pg: number,
-  signal: AbortSignal,
-): Promise<Song[]> {
+async function searchCcMixter(kw: string, pg: number, signal: AbortSignal): Promise<Song[]> {
   const url = `${API.CCMIXTER}?action=search&keyword=${encodeURIComponent(kw)}&page=${pg}&limit=${DEFAULT_LIMIT}`;
-  const res = await fetch(url, { signal });
-  const data = await res.json();
-  if (data.code === 1 && Array.isArray(data.data)) {
-    return data.data.map((item: any) => ({
-      id: String(item.id),
-      name: item.name || '',
-      artist: item.artist || '',
-      album: item.license || 'Creative Commons',
-      pic: item.pic,
-      source: 'cc' as const,
-      sourceType: 'ccmixter' as const,
-    }));
-  }
-  return [];
+  const data = await searchJson(url, signal);
+  if (data.code !== 1 || !Array.isArray(data.data)) throw new Error('ccMixter search unavailable');
+  return data.data.map((item: any) => ({
+    id: String(item.id), name: item.name || '', artist: item.artist || '',
+    album: item.license || 'Creative Commons', pic: item.pic,
+    source: 'cc' as const, sourceType: 'ccmixter' as const,
+  }));
 }
 
-async function searchArchive(
-  kw: string,
-  pg: number,
-  signal: AbortSignal,
-): Promise<Song[]> {
+async function searchArchive(kw: string, pg: number, signal: AbortSignal): Promise<Song[]> {
   const url = `${API.ARCHIVE}?action=search&keyword=${encodeURIComponent(kw)}&page=${pg}&limit=${DEFAULT_LIMIT}`;
-  const res = await fetch(url, { signal });
-  const data = await res.json();
-  if (data.code === 1 && Array.isArray(data.data)) {
-    return data.data.map((item: any) => ({
-      id: String(item.id),
-      name: item.name || '',
-      artist: item.artist || 'Internet Archive',
-      album: item.license || 'Creative Commons',
-      pic: item.pic,
-      source: 'ia' as const,
-      sourceType: 'archive' as const,
-    }));
-  }
-  return [];
+  const data = await searchJson(url, signal);
+  if (data.code !== 1 || !Array.isArray(data.data)) throw new Error('Internet Archive search unavailable');
+  return data.data.map((item: any) => ({
+    id: String(item.id), name: item.name || '', artist: item.artist || 'Internet Archive',
+    album: item.license || 'Creative Commons', pic: item.pic,
+    source: 'ia' as const, sourceType: 'archive' as const,
+  }));
 }
 
-async function searchAggregate(
-  kw: string,
-  pg: number,
-  signal: AbortSignal,
-): Promise<Song[]> {
-  const searches = [
-    searchStandard(kw, 'wy', pg, signal).catch(() => [] as Song[]),
-    searchStandard(kw, 'jx', pg, signal).catch(() => [] as Song[]),
-    searchAudius(kw, pg, signal).catch(() => [] as Song[]),
-    searchCcMixter(kw, pg, signal).catch(() => [] as Song[]),
-    searchArchive(kw, pg, signal).catch(() => [] as Song[]),
+async function searchAggregate(kw: string, pg: number, signal: AbortSignal): Promise<SearchResponse> {
+  const searches: Array<{ key: string; run: () => Promise<Song[]> }> = [
+    { key: 'wy', run: () => searchStandard(kw, 'wy', pg, signal) },
+    { key: 'jx', run: () => searchStandard(kw, 'jx', pg, signal) },
+    { key: 'au', run: () => searchAudius(kw, pg, signal) },
+    { key: 'cc', run: () => searchCcMixter(kw, pg, signal) },
+    { key: 'ia', run: () => searchArchive(kw, pg, signal) },
   ];
-  const results = await Promise.all(searches);
+  const results = await Promise.all(searches.map(async ({ key, run }) => {
+    try {
+      return { key, songs: await run(), status: 'ready' as const };
+    } catch {
+      return { key, songs: [] as Song[], status: 'error' as const };
+    }
+  }));
+  const statuses = Object.fromEntries(results.map(({ key, status }) => [key, status]));
   const merged: Song[] = [];
-  const maxLen = Math.max(...results.map((r) => r.length));
-  for (let i = 0; i < maxLen; i++) {
+  const maxLength = Math.max(0, ...results.map((result) => result.songs.length));
+  for (let index = 0; index < maxLength; index++) {
     for (const result of results) {
-      if (i < result.length) {
-        merged.push(result[i]);
-      }
+      if (result.songs[index]) merged.push(result.songs[index]);
     }
   }
-  return deduplicateSongs(merged);
+  return { songs: deduplicateSongs(merged).slice(0, DEFAULT_LIMIT), statuses };
 }
 
 export function useSearch() {
@@ -137,128 +119,110 @@ export function useSearch() {
   const [platform, setPlatform] = useState<string>(PLATFORMS[0].key);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [sourceStatus, setSourceStatus] = useState<SourceStatusMap>({});
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestRef = useRef(0);
+
+  const setLoadingStatuses = useCallback((plat: string) => {
+    if (plat === 'all') {
+      setSourceStatus(Object.fromEntries(SOURCE_KEYS.map((key) => [key, 'loading'])));
+    } else {
+      setSourceStatus((previous) => ({ ...previous, [plat]: 'loading' }));
+    }
+  }, []);
 
   const doSearch = useCallback(async (kw: string, plat: string, pg: number, append = false) => {
     if (!kw.trim()) {
       setResults([]);
+      setSourceStatus({});
       return;
     }
-
-    const platformInfo = PLATFORMS.find((p) => p.key === plat);
+    const platformInfo = PLATFORMS.find((item) => item.key === plat);
     if (!platformInfo) return;
+
+    const requestId = ++requestRef.current;
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
+    setLoading(true);
+    setLoadingStatuses(plat);
 
     const cacheKey = `search_${plat}_${kw}_${pg}`;
     const cached = requestCache.get<Song[]>(cacheKey);
     if (cached) {
-      if (append) {
-        setResults((prev) => [...prev, ...cached]);
-      } else {
-        setResults(cached);
-      }
+      if (requestId !== requestRef.current) return;
+      setResults((previous) => append ? deduplicateSongs([...previous, ...cached]) : cached);
       setHasMore(cached.length >= DEFAULT_LIMIT);
+      setSourceStatus(plat === 'all'
+        ? Object.fromEntries(SOURCE_KEYS.map((key) => [key, 'ready']))
+        : readyStatus(plat));
+      setLoading(false);
       return;
     }
 
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
-    abortRef.current = new AbortController();
-
-    setLoading(true);
-
-    let retries = 2;
-    while (retries >= 0) {
-      try {
-        let songs: Song[] = [];
-
-        if (platformInfo.type === 'aggregate') {
-          songs = await searchAggregate(kw, pg, abortRef.current.signal);
-        } else if (platformInfo.type === 'audius') {
-          songs = await searchAudius(kw, pg, abortRef.current.signal);
-        } else if (platformInfo.type === 'ccmixter') {
-          songs = await searchCcMixter(kw, pg, abortRef.current.signal);
-        } else if (platformInfo.type === 'archive') {
-          songs = await searchArchive(kw, pg, abortRef.current.signal);
-        } else {
-          songs = await searchStandard(kw, plat, pg, abortRef.current.signal);
-        }
-
-        requestCache.set(cacheKey, songs, CACHE_TTL.SEARCH);
-
-        if (append) {
-          setResults((prev) => [...prev, ...songs]);
-        } else {
-          setResults(songs);
-        }
-        setHasMore(songs.length >= DEFAULT_LIMIT);
-        setLoading(false);
-        addSearchHistory(kw);
-        return;
-      } catch (err: any) {
-        if (err.name === 'AbortError') {
-          setLoading(false);
-          return;
-        }
-        retries--;
-        if (retries < 0) {
-          setLoading(false);
-          setResults(append ? results : []);
-          return;
-        }
-        await new Promise((r) => setTimeout(r, 800));
+    try {
+      let response: SearchResponse;
+      if (platformInfo.type === 'aggregate') {
+        response = await searchAggregate(kw, pg, signal);
+      } else if (platformInfo.type === 'audius') {
+        response = { songs: await searchAudius(kw, pg, signal), statuses: readyStatus(plat) };
+      } else if (platformInfo.type === 'ccmixter') {
+        response = { songs: await searchCcMixter(kw, pg, signal), statuses: readyStatus(plat) };
+      } else if (platformInfo.type === 'archive') {
+        response = { songs: await searchArchive(kw, pg, signal), statuses: readyStatus(plat) };
+      } else {
+        response = { songs: await searchStandard(kw, plat, pg, signal), statuses: readyStatus(plat) };
       }
+      if (requestId !== requestRef.current) return;
+      requestCache.set(cacheKey, response.songs, CACHE_TTL.SEARCH);
+      setResults((previous) => append ? deduplicateSongs([...previous, ...response.songs]) : response.songs);
+      setHasMore(response.songs.length >= DEFAULT_LIMIT);
+      setSourceStatus(response.statuses);
+      addSearchHistory(kw);
+    } catch (error: any) {
+      if (requestId !== requestRef.current || error?.name === 'AbortError') return;
+      setResults((previous) => append ? previous : []);
+      setHasMore(false);
+      setSourceStatus(plat === 'all'
+        ? Object.fromEntries(SOURCE_KEYS.map((key) => [key, 'error']))
+        : { [plat]: 'error' });
+    } finally {
+      if (requestId === requestRef.current) setLoading(false);
     }
-  }, [results]);
+  }, [setLoadingStatuses]);
 
   const search = useCallback((kw: string, plat?: string) => {
-    const p = plat || platform;
+    const nextPlatform = plat || platform;
     setKeyword(kw);
     if (plat) setPlatform(plat);
     setPage(1);
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    debounceRef.current = setTimeout(() => {
-      doSearch(kw, p, 1);
-    }, SEARCH_DEBOUNCE_MS);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(kw, nextPlatform, 1), SEARCH_DEBOUNCE_MS);
   }, [platform, doSearch]);
 
   const searchImmediate = useCallback((kw: string, plat?: string) => {
-    const p = plat || platform;
+    const nextPlatform = plat || platform;
     setKeyword(kw);
     if (plat) setPlatform(plat);
     setPage(1);
-    doSearch(kw, p, 1);
+    doSearch(kw, nextPlatform, 1);
   }, [platform, doSearch]);
 
   const loadMore = useCallback(() => {
-    const next = page + 1;
-    setPage(next);
-    doSearch(keyword, platform, next, true);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    doSearch(keyword, platform, nextPage, true);
   }, [page, keyword, platform, doSearch]);
 
-  const changePlatform = useCallback((plat: string) => {
-    setPlatform(plat);
+  const changePlatform = useCallback((nextPlatform: string) => {
+    setPlatform(nextPlatform);
     setPage(1);
-    if (keyword.trim()) {
-      doSearch(keyword, plat, 1);
-    }
+    if (keyword.trim()) doSearch(keyword, nextPlatform, 1);
   }, [keyword, doSearch]);
 
   return {
-    results,
-    loading,
-    keyword,
-    platform,
-    hasMore,
-    search,
-    searchImmediate,
-    loadMore,
-    changePlatform,
-    setKeyword,
+    results, loading, keyword, platform, hasMore, sourceStatus,
+    search, searchImmediate, loadMore, changePlatform, setKeyword,
   };
 }

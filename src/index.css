@@ -571,6 +571,33 @@ a {
   color: #b07ae8;
 }
 
+.source-status {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.source-status-loading {
+  background: #e7a93b;
+  animation: source-pulse 0.9s ease-in-out infinite alternate;
+}
+
+.source-status-ready {
+  background: #42bb78;
+}
+
+.source-status-error {
+  background: var(--primary);
+}
+
+@keyframes source-pulse {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+
 .source-badge-cc {
   background: rgba(39, 174, 96, 0.15);
   color: #31b66a;
@@ -1577,6 +1604,27 @@ a {
   color: var(--text-main);
 }
 
+.eq-compare-btn {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.eq-compare-btn:hover:not(:disabled),
+.eq-compare-btn.active {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.eq-compare-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .eq-close-btn {
   background: none;
   border: none;
@@ -1636,6 +1684,13 @@ a {
   line-height: 1.6;
   color: var(--text-secondary);
   opacity: 0.75;
+}
+
+.eq-safety {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .eq-switch-row {

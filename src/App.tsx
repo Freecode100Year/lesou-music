@@ -178,6 +178,7 @@ export default function App() {
             loading={searchHook.loading}
             keyword={searchHook.keyword}
             platform={searchHook.platform}
+            sourceStatus={searchHook.sourceStatus}
             hasMore={searchHook.hasMore}
             search={searchHook.search}
             searchImmediate={searchHook.searchImmediate}
@@ -257,6 +258,7 @@ export default function App() {
         onClose={() => setShowEqualizer(false)}
         gains={eq.gains}
         enabled={eq.enabled}
+        bypassed={eq.bypassed}
         preset={eq.preset}
         onSetBandGain={eq.setBandGain}
         onReset={eq.reset}
@@ -266,6 +268,7 @@ export default function App() {
             player.activateWebAudio();
           }
         }}
+        onSetBypassed={eq.setBypassed}
         onApplyPreset={eq.applyPreset}
         deEsser={player.deEsser}
         loudnessComp={player.loudnessComp}
