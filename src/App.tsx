@@ -85,6 +85,18 @@ export default function App() {
           if (data.code === 1 && data.data) {
             url = data.data.url || '';
           }
+        } else if (song.sourceType === 'openverse') {
+          const res = await fetch(`${API.OPENVERSE}?action=song&id=${encodeURIComponent(song.id)}`);
+          const data = await res.json();
+          if (data.code === 1 && data.data) {
+            url = data.data.url || '';
+          }
+        } else if (song.sourceType === 'wikimedia') {
+          const res = await fetch(`${API.WIKIMEDIA}?action=song&id=${encodeURIComponent(song.id)}`);
+          const data = await res.json();
+          if (data.code === 1 && data.data) {
+            url = data.data.url || '';
+          }
         } else if (song.sourceType === 'gd') {
           const res = await fetch(`${API.GD}?types=url&source=${song.source}&id=${song.id}&br=320`);
           const data = await res.json();

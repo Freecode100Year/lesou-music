@@ -5,6 +5,8 @@ export const API = {
   AUDIUS: '/api/audius',
   CCMIXTER: '/api/ccmixter',
   ARCHIVE: '/api/archive',
+  OPENVERSE: '/api/openverse',
+  WIKIMEDIA: '/api/wikimedia',
   AUDIO_PROXY: '/api/audio-proxy',
 } as const;
 
@@ -17,6 +19,8 @@ export const PLATFORMS = [
   { key: 'au', label: 'Audius', type: 'audius' as const },
   { key: 'cc', label: 'ccMixter', type: 'ccmixter' as const },
   { key: 'ia', label: '互联网档案馆', type: 'archive' as const },
+  { key: 'ov', label: 'Openverse', type: 'openverse' as const },
+  { key: 'wm', label: '维基共享资源', type: 'wikimedia' as const },
 ] as const;
 
 export const CACHE_TTL = {

@@ -86,6 +86,28 @@ async function searchArchive(kw: string, pg: number, signal: AbortSignal): Promi
   }));
 }
 
+async function searchOpenverse(kw: string, pg: number, signal: AbortSignal): Promise<Song[]> {
+  const url = `${API.OPENVERSE}?action=search&keyword=${encodeURIComponent(kw)}&page=${pg}&limit=${DEFAULT_LIMIT}`;
+  const data = await searchJson(url, signal);
+  if (data.code !== 1 || !Array.isArray(data.data)) throw new Error('Openverse search unavailable');
+  return data.data.map((item: any) => ({
+    id: String(item.id), name: item.name || '', artist: item.artist || 'Openverse',
+    album: item.license || 'Creative Commons', pic: item.pic, duration: item.duration,
+    source: 'ov' as const, sourceType: 'openverse' as const,
+  }));
+}
+
+async function searchWikimedia(kw: string, pg: number, signal: AbortSignal): Promise<Song[]> {
+  const url = `${API.WIKIMEDIA}?action=search&keyword=${encodeURIComponent(kw)}&page=${pg}&limit=${DEFAULT_LIMIT}`;
+  const data = await searchJson(url, signal);
+  if (data.code !== 1 || !Array.isArray(data.data)) throw new Error('Wikimedia search unavailable');
+  return data.data.map((item: any) => ({
+    id: String(item.id), name: item.name || '', artist: item.artist || 'Wikimedia Commons',
+    album: item.license || 'Wikimedia Commons', pic: item.pic,
+    source: 'wm' as const, sourceType: 'wikimedia' as const,
+  }));
+}
+
 async function searchAggregate(kw: string, pg: number, signal: AbortSignal): Promise<SearchResponse> {
   const searches: Array<{ key: string; run: () => Promise<Song[]> }> = [
     { key: 'wy', run: () => searchStandard(kw, 'wy', pg, signal) },
@@ -93,6 +115,8 @@ async function searchAggregate(kw: string, pg: number, signal: AbortSignal): Pro
     { key: 'au', run: () => searchAudius(kw, pg, signal) },
     { key: 'cc', run: () => searchCcMixter(kw, pg, signal) },
     { key: 'ia', run: () => searchArchive(kw, pg, signal) },
+    { key: 'ov', run: () => searchOpenverse(kw, pg, signal) },
+    { key: 'wm', run: () => searchWikimedia(kw, pg, signal) },
   ];
   const results = await Promise.all(searches.map(async ({ key, run }) => {
     try {
@@ -171,6 +195,10 @@ export function useSearch() {
         response = { songs: await searchCcMixter(kw, pg, signal), statuses: readyStatus(plat) };
       } else if (platformInfo.type === 'archive') {
         response = { songs: await searchArchive(kw, pg, signal), statuses: readyStatus(plat) };
+      } else if (platformInfo.type === 'openverse') {
+        response = { songs: await searchOpenverse(kw, pg, signal), statuses: readyStatus(plat) };
+      } else if (platformInfo.type === 'wikimedia') {
+        response = { songs: await searchWikimedia(kw, pg, signal), statuses: readyStatus(plat) };
       } else {
         response = { songs: await searchStandard(kw, plat, pg, signal), statuses: readyStatus(plat) };
       }

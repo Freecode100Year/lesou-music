@@ -11,13 +11,15 @@ export interface Song {
 
 }
 
-export type SourceType = 'standard' | 'gd' | 'audius' | 'ccmixter' | 'archive';
+export type SourceType = 'standard' | 'gd' | 'audius' | 'ccmixter' | 'archive' | 'openverse' | 'wikimedia';
 export type StandardPlatform = 'wy' | 'jx';
 export type GDSource = 'netease' | 'joox';
 export type AudiusSource = 'au';
 export type CcMixterSource = 'cc';
 export type ArchiveSource = 'ia';
-export type SongSource = StandardPlatform | GDSource | AudiusSource | CcMixterSource | ArchiveSource;
+export type OpenverseSource = 'ov';
+export type WikimediaSource = 'wm';
+export type SongSource = StandardPlatform | GDSource | AudiusSource | CcMixterSource | ArchiveSource | OpenverseSource | WikimediaSource;
 
 export interface SongDetail {
   url: string;

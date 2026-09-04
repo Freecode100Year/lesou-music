@@ -4,6 +4,7 @@ const ALLOWED_DOMAINS = [
   'audius.co',
   'ccmixter.org',
   'archive.org',
+  'wikimedia.org',
   'injahow.cn',
 ];
 
@@ -36,7 +37,7 @@ export const onRequestGet: PagesFunction = async (context) => {
     return new Response('Invalid url', { status: 400, headers: CORS_HEADERS });
   }
 
-  const isAllowed = ALLOWED_DOMAINS.some(d => parsed.hostname.endsWith(d));
+  const isAllowed = ALLOWED_DOMAINS.some((domain) => parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`));
   if (!isAllowed) {
     return new Response('Domain not allowed', { status: 403, headers: CORS_HEADERS });
   }

@@ -640,7 +640,7 @@ export function usePlayer(
   }, [isPlaying]);
 
   const proxyUrl = useCallback((url: string): string => {
-    if (!url || url.startsWith('blob:') || url.startsWith('data:')) return url;
+    if (!url || url.startsWith('/') || url.startsWith('blob:') || url.startsWith('data:')) return url;
     return `${API.AUDIO_PROXY}?url=${encodeURIComponent(url)}`;
   }, []);
 
@@ -723,6 +723,19 @@ export function usePlayer(
           if (data.code === 1 && data.data) {
             url = data.data.url || '';
           }
+        } else if (song.sourceType === 'openverse') {
+          const res = await fetch(`${API.OPENVERSE}?action=song&id=${encodeURIComponent(song.id)}`);
+          const data = await res.json();
+          if (data.code === 1 && data.data) {
+            url = data.data.url || '';
+            if (data.data.pic) {
+              requestCache.set(`pic_${song.sourceType}_${song.source}_${song.id}`, data.data.pic, CACHE_TTL.PIC);
+            }
+          }
+        } else if (song.sourceType === 'wikimedia') {
+          const res = await fetch(`${API.WIKIMEDIA}?action=song&id=${encodeURIComponent(song.id)}`);
+          const data = await res.json();
+          if (data.code === 1 && data.data) url = data.data.url || '';
         } else if (song.sourceType === 'gd') {
           const res = await fetch(`${API.GD}?types=url&source=${song.source}&id=${song.id}&br=320`);
           const data = await res.json();
