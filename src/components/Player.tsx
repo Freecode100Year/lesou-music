@@ -178,34 +178,6 @@ export function Player({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="player-boost-wrap">
-        <button
-          className={`player-boost-btn ${gainMultiplier > 1 ? 'boosted' : ''}`}
-          onClick={() => setShowBoost((show) => !show)}
-          aria-expanded={showBoost}
-          title="音量增强，最高 3 倍"
-        >
-          {gainMultiplier.toFixed(1)}x
-        </button>
-        {showBoost && (
-          <div className="player-boost-popup">
-            <div className="player-boost-label">
-              <span>音量增强</span>
-              <span className="player-boost-value">{gainMultiplier.toFixed(1)}x</span>
-            </div>
-            <input
-              type="range"
-              min="1"
-              max="3"
-              step="0.1"
-              value={gainMultiplier}
-              onChange={(e) => onSetGainMultiplier(parseFloat(e.target.value))}
-              className="player-boost-slider"
-              aria-label="音量增强倍数"
-            />
-          </div>
-        )}
-      </div>
       <div
         className="player-progress"
         ref={progressRef}
@@ -269,6 +241,34 @@ export function Player({
               <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
             </svg>
           </button>
+          <div className="player-boost-wrap">
+            <button
+              className={`player-btn player-boost-btn ${gainMultiplier > 1 ? 'boosted' : ''}`}
+              onClick={() => setShowBoost((show) => !show)}
+              aria-expanded={showBoost}
+              title="音量增强，最高 3 倍"
+            >
+              {gainMultiplier.toFixed(1)}x
+            </button>
+            {showBoost && (
+              <div className="player-boost-popup">
+                <div className="player-boost-label">
+                  <span>音量增强</span>
+                  <span className="player-boost-value">{gainMultiplier.toFixed(1)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.1"
+                  value={gainMultiplier}
+                  onChange={(e) => onSetGainMultiplier(parseFloat(e.target.value))}
+                  className="player-boost-slider"
+                  aria-label="音量增强倍数"
+                />
+              </div>
+            )}
+          </div>
           <button className="player-btn" onClick={onShowQueue}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
               <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />

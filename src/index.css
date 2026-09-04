@@ -970,35 +970,24 @@ a {
   color: var(--primary-hover);
 }
 
-/* Volume boost lives directly above the transport, where it remains reachable
-   with one thumb on mobile instead of being hidden in the top bar. */
+/* Volume boost is one of the player transport controls. */
 .player-boost-wrap {
-  position: absolute;
-  right: 20px;
-  bottom: calc(100% + 12px);
-  z-index: 4;
+  position: relative;
 }
 
 .player-boost-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  min-height: 36px;
-  padding: 6px 10px;
+  min-width: 38px;
+  height: 34px;
+  padding: 5px 7px;
   border: 1px solid var(--border);
-  background: var(--bg-card);
-  border-radius: 18px;
-  color: var(--text-main);
-  font-size: 12px;
+  border-radius: 8px;
+  font-size: 11px;
   font-weight: 600;
-  box-shadow: var(--shadow);
-  transition: all var(--transition);
   white-space: nowrap;
 }
 
 .player-boost-btn:hover {
-  background: var(--bg-hover);
+  border-color: var(--text-secondary);
 }
 
 .player-boost-btn.boosted {
@@ -1009,8 +998,9 @@ a {
 .player-boost-popup {
   position: absolute;
   bottom: 100%;
-  right: 0;
-  margin-bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1899,15 +1889,13 @@ a {
   }
 
   .player-boost-wrap {
-    right: 12px;
-    bottom: calc(100% + 10px);
+    flex-shrink: 0;
   }
 
   .player-boost-btn {
-    min-width: 52px;
-    min-height: 44px;
-    border-radius: 22px;
-    font-size: 13px;
+    min-width: 42px;
+    height: 38px;
+    font-size: 12px;
   }
 
   .player-boost-popup {
