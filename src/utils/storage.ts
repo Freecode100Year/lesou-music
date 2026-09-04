@@ -88,7 +88,7 @@ export function getCrossfeedMode(): CrossfeedMode {
   if (raw && (CROSSFEED_MODES as string[]).includes(raw)) return raw as CrossfeedMode;
   // Migrate the old on/off flag.
   const legacy = localStorage.getItem(KEYS.SPATIAL_AUDIO);
-  return legacy === 'false' ? 'off' : 'medium';
+  return legacy === 'true' ? 'medium' : 'off';
 }
 
 export function setCrossfeedMode(mode: CrossfeedMode): void {
@@ -96,25 +96,22 @@ export function setCrossfeedMode(mode: CrossfeedMode): void {
   localStorage.setItem(KEYS.SPATIAL_AUDIO, String(mode !== 'off'));
 }
 
-// De-esser on by default: the canal resonance of an in-ear sits around 6-8 kHz,
-// right where 320 kbps lossy encodes are already grainiest, so sibilance that is
-// merely bright on speakers turns into a needle in the ear.
+// De-essing changes the high-frequency content of every track. Keep it opt-in
+// so a clean recording or a neutral headphone is not processed unnecessarily.
 export function getDeEsser(): boolean {
   const raw = localStorage.getItem(KEYS.DEESSER);
-  return raw === null ? true : raw === 'true';
+  return raw === 'true';
 }
 
 export function setDeEsser(enabled: boolean): void {
   localStorage.setItem(KEYS.DEESSER, String(enabled));
 }
 
-// Equal-loudness compensation, also on by default. In-ears isolate, so people
-// play them quieter than speakers, and at low SPL the ear loses bass extension
-// faster than anything else (ISO 226). Tracking the volume control with a gentle
-// shelf keeps the balance the mix engineer intended.
+// Equal-loudness compensation intentionally colours the mix, so leave it to
+// listeners who prefer it at lower volumes instead of applying it by default.
 export function getLoudnessComp(): boolean {
   const raw = localStorage.getItem(KEYS.LOUDNESS_COMP);
-  return raw === null ? true : raw === 'true';
+  return raw === 'true';
 }
 
 export function setLoudnessComp(enabled: boolean): void {
