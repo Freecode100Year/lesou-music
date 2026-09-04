@@ -1,5 +1,6 @@
 const OPENVERSE = 'https://api.openverse.org/v1/audio/';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ANONYMOUS_PAGE_SIZE = 20;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -46,10 +47,23 @@ export const onRequestGet: PagesFunction = async (context) => {
     const limit = Math.min(60, Math.max(1, Number.parseInt(requestUrl.searchParams.get('limit') || '12', 10)));
     if (!keyword) return jsonResponse({ code: 1, data: [] });
 
-    const query = new URLSearchParams({ q: keyword, page: String(page), page_size: String(limit) });
-    const result = await openverseFetch(`?${query.toString()}`);
-    if (!Array.isArray(result?.results)) return jsonResponse({ code: 0, data: [], msg: 'Openverse search failed' });
-    const data = result.results
+    // Openverse caps anonymous callers at 20 records per request.  Fetch the
+    // required pages here so the app can still expose the shared 60-item limit.
+    const pageCount = Math.ceil(limit / ANONYMOUS_PAGE_SIZE);
+    const firstUpstreamPage = (page - 1) * pageCount + 1;
+    const responses = await Promise.all(Array.from({ length: pageCount }, (_, index) => {
+      const query = new URLSearchParams({
+        q: keyword,
+        page: String(firstUpstreamPage + index),
+        page_size: String(ANONYMOUS_PAGE_SIZE),
+      });
+      return openverseFetch(`?${query.toString()}`);
+    }));
+    const results = responses.flatMap((result) => Array.isArray(result?.results) ? result.results : []);
+    if (!results.length && responses.every((result) => result === null)) {
+      return jsonResponse({ code: 0, data: [], msg: 'Openverse search failed' });
+    }
+    const data = results
       .filter((item: any) => UUID.test(String(item?.id || '')) && item?.url)
       .map((item: any) => ({
         id: item.id,
@@ -58,7 +72,8 @@ export const onRequestGet: PagesFunction = async (context) => {
         license: licenseLabel(item),
         pic: item.thumbnail || '',
         duration: typeof item.duration === 'number' ? Math.round(item.duration / 1000) : undefined,
-      }));
+      }))
+      .slice(0, limit);
     return jsonResponse({ code: 1, data });
   }
 
